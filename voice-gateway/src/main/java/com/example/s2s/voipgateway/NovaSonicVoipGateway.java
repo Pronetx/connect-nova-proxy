@@ -112,6 +112,11 @@ public class NovaSonicVoipGateway extends RegisteringMultipleUAS {
                 mediaConfig.setCallerPhoneNumber(callerPhone);
                 LOG.info("Caller phone number: {}", callerPhone);
 
+                // Extract called number (DID) and store in config
+                String calledNumber = extractPhoneNumber(callee.getAddress().toString());
+                mediaConfig.setCalledNumber(calledNumber);
+                LOG.info("Called number: {}", calledNumber);
+
                 // Set hangup callback to terminate the call when Nova requests it
                 mediaConfig.setHangupCallback(() -> {
                     LOG.info("Hangup callback triggered - terminating call");

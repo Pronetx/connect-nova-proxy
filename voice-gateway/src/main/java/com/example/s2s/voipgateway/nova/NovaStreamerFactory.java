@@ -67,8 +67,12 @@ public class NovaStreamerFactory implements StreamerFactory {
             callerPhone = "+10000000000"; // Default placeholder
         }
 
-        // Load prompt configuration from environment variable or use default
-        String promptConfigPath = System.getenv().getOrDefault("NOVA_PROMPT_FILE", "prompts/default.prompt");
+        // Get called number from media config
+        String calledNumber = mediaConfig.getCalledNumber();
+
+        // Select prompt based on caller/called number using PromptSelector
+        String promptConfigPath = com.example.s2s.voipgateway.nova.tools.PromptSelector.selectPrompt(
+                callerPhone, calledNumber);
         PromptConfiguration promptConfig = null;
         String systemPrompt = mediaConfig.getNovaPrompt();
 
