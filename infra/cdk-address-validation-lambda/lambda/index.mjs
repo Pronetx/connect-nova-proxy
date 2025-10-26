@@ -49,6 +49,17 @@ export const handler = async (event) => {
 
         console.log('SmartyStreets response:', JSON.stringify(smartyResponse, null, 2));
 
+        // Check for API errors
+        if (smartyResponse.errors && smartyResponse.errors.length > 0) {
+            const error = smartyResponse.errors[0];
+            console.error('SmartyStreets API error:', error);
+            return createResponse(200, {
+                status: 'error',
+                message: `Address validation service error: ${error.message}`,
+                conversationalResponse: "I'm having trouble connecting to the address validation service. Let me proceed with your address as provided."
+            });
+        }
+
         // Process response
         const validationResult = processValidationResponse(smartyResponse, address);
 

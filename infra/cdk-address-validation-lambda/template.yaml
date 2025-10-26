@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: SmartyStreets Address Validation Lambda with Function URL
+
+Parameters:
+  SmartyAuthId:
+    Type: String
+    Description: SmartyStreets Auth ID
+    Default: '666a32c0-96c8-6da4-4ff1-fc13f750a553'
+
+  SmartyAuthToken:
+    Type: String
+    Description: SmartyStreets Auth Token
+    NoEcho: true
+    Default: 'TT6S1KlLrjmVz9eSLoE3'
+
+Resources:
+  AddressValidationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: NovaAddressValidationFunction
+      Runtime: nodejs20.x
+      Handler: index.handler
+      CodeUri: ./lambda
+      Timeout: 30
+      MemorySize: 256
+      Description: Validates US addresses using SmartyStreets US Street API with enhanced matching
+      Environment:
+        Variables:
+          SMARTY_AUTH_ID: !Ref SmartyAuthId
+          SMARTY_AUTH_TOKEN: !Ref SmartyAuthToken
+      FunctionUrlConfig:
+        AuthType: NONE
+        Cors:
+          AllowOrigins:
+            - '*'
+          AllowMethods:
+            - POST
+            - GET
+          AllowHeaders:
+            - Content-Type
+      Policies:
+        - CloudWatchLogsFullAccess
+
+Outputs:
+  FunctionName:
+    Description: Lambda function name
+    Value: !Ref AddressValidationFunction
+
+  FunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt AddressValidationFunction.Arn
+
+  FunctionUrl:
+    Description: Lambda Function URL (use this in AddressValidationTool)
+    Value: !GetAtt AddressValidationFunctionUrl.FunctionUrl
+
+  LogGroupName:
+    Description: CloudWatch log group name
+    Value: !Sub '/aws/lambda/${AddressValidationFunction}'
