@@ -87,24 +87,27 @@ public class SendSMSTool implements Tool {
                 return;
             }
 
-            // Validate phone number format (basic check)
-            if (!phoneNumber.matches("^\\+?[1-9]\\d{1,14}$")) {
+            // Normalize phone number (remove formatting characters but keep +)
+            String normalizedPhone = phoneNumber.replaceAll("[\\s()\\-.]", "");
+
+            // Validate normalized phone number format (E.164 format: +[country code][number])
+            if (!normalizedPhone.matches("^\\+?[1-9]\\d{1,14}$")) {
                 output.put("status", "error");
                 output.put("message", "Invalid phone number format. Please provide a valid phone number with country code.");
-                log.warn("Invalid phone number format: {}", phoneNumber);
+                log.warn("Invalid phone number format: {} (normalized: {})", phoneNumber, normalizedPhone);
                 return;
             }
 
-            log.info("Sending SMS to {} with message length: {}", phoneNumber, message.length());
+            log.info("Sending SMS to {} (normalized: {}) with message length: {}", phoneNumber, normalizedPhone, message.length());
 
-            // Send SMS
-            boolean smsSent = sendSMS(phoneNumber, message);
+            // Send SMS using normalized phone number
+            boolean smsSent = sendSMS(normalizedPhone, message);
 
             if (smsSent) {
                 output.put("status", "success");
-                output.put("phoneNumber", phoneNumber);
+                output.put("phoneNumber", normalizedPhone);
                 output.put("message", String.format("SMS sent successfully to %s.", formatPhoneNumberForSpeech(phoneNumber)));
-                log.info("SMS sent successfully to {}", phoneNumber);
+                log.info("SMS sent successfully to {} (normalized: {})", phoneNumber, normalizedPhone);
             } else {
                 output.put("status", "error");
                 output.put("message", "Failed to send SMS. There may be an issue with the messaging service.");
