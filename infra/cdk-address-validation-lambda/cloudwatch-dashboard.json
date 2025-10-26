@@ -1,0 +1,245 @@
+{
+    "widgets": [
+        {
+            "type": "metric",
+            "properties": {
+                "metrics": [
+                    [ "AWS/Lambda", "Invocations", { "stat": "Sum", "label": "Total Invocations" } ],
+                    [ ".", "Errors", { "stat": "Sum", "label": "Errors", "color": "#d13212" } ],
+                    [ ".", "Throttles", { "stat": "Sum", "label": "Throttles", "color": "#ff7f0e" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "us-west-2",
+                "title": "Lambda Invocations & Errors",
+                "period": 300,
+                "yAxis": {
+                    "left": {
+                        "min": 0
+                    }
+                },
+                "annotations": {
+                    "horizontal": [
+                        {
+                            "label": "Error Threshold",
+                            "value": 10,
+                            "fill": "above",
+                            "color": "#d13212"
+                        }
+                    ]
+                }
+            },
+            "width": 12,
+            "height": 6,
+            "x": 0,
+            "y": 0
+        },
+        {
+            "type": "metric",
+            "properties": {
+                "metrics": [
+                    [ "AWS/Lambda", "Duration", { "stat": "Average", "label": "Avg Duration" } ],
+                    [ "...", { "stat": "Maximum", "label": "Max Duration", "color": "#ff7f0e" } ],
+                    [ "...", { "stat": "p99", "label": "P99 Duration", "color": "#d62728" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "us-west-2",
+                "title": "Lambda Duration (ms)",
+                "period": 300,
+                "yAxis": {
+                    "left": {
+                        "min": 0
+                    }
+                },
+                "annotations": {
+                    "horizontal": [
+                        {
+                            "label": "3 Second Target",
+                            "value": 3000,
+                            "fill": "above",
+                            "color": "#ff7f0e"
+                        }
+                    ]
+                }
+            },
+            "width": 12,
+            "height": 6,
+            "x": 12,
+            "y": 0
+        },
+        {
+            "type": "metric",
+            "properties": {
+                "metrics": [
+                    [ "AWS/Lambda", "ConcurrentExecutions", { "stat": "Maximum", "label": "Concurrent Executions" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "us-west-2",
+                "title": "Lambda Concurrent Executions",
+                "period": 300,
+                "yAxis": {
+                    "left": {
+                        "min": 0
+                    }
+                }
+            },
+            "width": 8,
+            "height": 6,
+            "x": 0,
+            "y": 6
+        },
+        {
+            "type": "metric",
+            "properties": {
+                "metrics": [
+                    [ "AWS/Lambda", "Invocations", { "stat": "Sum", "label": "Success Rate", "id": "m1", "visible": false } ],
+                    [ ".", "Errors", { "stat": "Sum", "id": "m2", "visible": false } ],
+                    [ { "expression": "(m1-m2)/m1*100", "label": "Success Rate (%)", "id": "e1", "color": "#2ca02c" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "us-west-2",
+                "title": "Lambda Success Rate",
+                "period": 300,
+                "yAxis": {
+                    "left": {
+                        "min": 0,
+                        "max": 100
+                    }
+                },
+                "annotations": {
+                    "horizontal": [
+                        {
+                            "label": "Target 99%",
+                            "value": 99,
+                            "fill": "below",
+                            "color": "#d13212"
+                        }
+                    ]
+                }
+            },
+            "width": 8,
+            "height": 6,
+            "x": 8,
+            "y": 6
+        },
+        {
+            "type": "log",
+            "properties": {
+                "query": "SOURCE '/aws/lambda/NovaAddressValidationFunction'\n| fields @timestamp, @message\n| filter @message like /status/\n| parse @message /.*\"status\":\"(?<status>[^\"]*)\".*/\n| stats count() by status",
+                "region": "us-west-2",
+                "stacked": false,
+                "title": "Address Validation Status Distribution",
+                "view": "pie"
+            },
+            "width": 8,
+            "height": 6,
+            "x": 16,
+            "y": 6
+        },
+        {
+            "type": "log",
+            "properties": {
+                "query": "SOURCE '/aws/lambda/NovaAddressValidationFunction'\n| fields @timestamp, @message\n| filter @message like /ERROR/ or @message like /error/\n| sort @timestamp desc\n| limit 20",
+                "region": "us-west-2",
+                "stacked": false,
+                "title": "Recent Lambda Errors",
+                "view": "table"
+            },
+            "width": 12,
+            "height": 6,
+            "x": 0,
+            "y": 12
+        },
+        {
+            "type": "log",
+            "properties": {
+                "query": "SOURCE '/aws/lambda/NovaAddressValidationFunction'\n| fields @timestamp, @duration\n| filter @duration > 3000\n| sort @timestamp desc\n| limit 20",
+                "region": "us-west-2",
+                "stacked": false,
+                "title": "Slow Requests (>3s)",
+                "view": "table"
+            },
+            "width": 12,
+            "height": 6,
+            "x": 12,
+            "y": 12
+        },
+        {
+            "type": "log",
+            "properties": {
+                "query": "SOURCE '/aws/lambda/NovaAddressValidationFunction'\n| fields @timestamp, @message\n| filter @message like /Validating address/\n| parse @message /.*city.*:.*\"(?<city>[^\"]*)\".*/\n| stats count() by city\n| sort count desc\n| limit 10",
+                "region": "us-west-2",
+                "stacked": false,
+                "title": "Top 10 Cities Validated",
+                "view": "bar"
+            },
+            "width": 12,
+            "height": 6,
+            "x": 0,
+            "y": 18
+        },
+        {
+            "type": "metric",
+            "properties": {
+                "metrics": [
+                    [ "AWS/Lambda", "Invocations", { "stat": "Sum", "label": "Invocations per Hour" } ]
+                ],
+                "view": "singleValue",
+                "region": "us-west-2",
+                "title": "Hourly Invocation Count",
+                "period": 3600
+            },
+            "width": 6,
+            "height": 3,
+            "x": 12,
+            "y": 18
+        },
+        {
+            "type": "metric",
+            "properties": {
+                "metrics": [
+                    [ "AWS/Lambda", "Duration", { "stat": "Average", "label": "Avg Response Time" } ]
+                ],
+                "view": "singleValue",
+                "region": "us-west-2",
+                "title": "Average Response Time (ms)",
+                "period": 300
+            },
+            "width": 6,
+            "height": 3,
+            "x": 18,
+            "y": 18
+        },
+        {
+            "type": "log",
+            "properties": {
+                "query": "SOURCE '/aws/lambda/NovaAddressValidationFunction'\n| fields @timestamp, @message\n| filter @message like /SmartyStreets API error/\n| parse @message /.*message.*:.*\"(?<error>[^\"]*)\".*/\n| stats count() by error",
+                "region": "us-west-2",
+                "stacked": false,
+                "title": "SmartyStreets API Errors",
+                "view": "table"
+            },
+            "width": 12,
+            "height": 6,
+            "x": 12,
+            "y": 21
+        },
+        {
+            "type": "log",
+            "properties": {
+                "query": "SOURCE '/aws/lambda/NovaAddressValidationFunction'\n| fields @timestamp, @duration\n| stats avg(@duration) as avg_duration, max(@duration) as max_duration, min(@duration) as min_duration, pct(@duration, 95) as p95_duration, pct(@duration, 99) as p99_duration by bin(5m)",
+                "region": "us-west-2",
+                "stacked": false,
+                "title": "Duration Statistics (5min buckets)",
+                "view": "timeSeries"
+            },
+            "width": 12,
+            "height": 6,
+            "x": 0,
+            "y": 21
+        }
+    ]
+}
