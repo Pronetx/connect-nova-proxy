@@ -31,7 +31,8 @@ public class ToolProvider {
             TOOLS_PACKAGE + ".HangupTool",
             TOOLS_PACKAGE + ".GetCallerPhoneTool",
             TOOLS_PACKAGE + ".CollectAddressTool",
-            TOOLS_PACKAGE + ".SendSMSTool"
+            TOOLS_PACKAGE + ".SendSMSTool",
+            TOOLS_PACKAGE + ".AddressValidationTool"
     );
 
     /**

@@ -1,0 +1,13 @@
+*.js
+!bin/*.js
+!lib/*.js
+!lambda/*.mjs
+*.d.ts
+node_modules
+
+# CDK asset staging directory
+.cdk.staging
+cdk.out
+
+# Environment variables
+.env

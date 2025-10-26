@@ -79,7 +79,8 @@ voice-gateway/
 - `VerifyOTPTool` - Verifies OTP code from caller
 - `HangupTool` - Ends the call gracefully
 - `GetCallerPhoneTool` - Returns caller's phone number
-- `CollectAddressTool` - Collects and validates caller's address
+- `CollectAddressTool` - Collects caller's address components
+- `AddressValidationTool` - Validates US addresses via SmartyStreets API (Lambda)
 - `SendSMSTool` - Generic SMS sender for any message
 
 **Architecture:**
@@ -93,16 +94,27 @@ voice-gateway/
 2. Add class name to `ToolProvider.TOOL_CLASSES` list
 3. Tool is automatically discovered and registered
 
-### 5. Address Collection & SMS Messaging
+### 5. Address Collection, Validation & SMS Messaging
 
-The gateway supports conversational address collection with optional SMS confirmation:
+The gateway supports conversational address collection with SmartyStreets validation and optional SMS confirmation:
 
-**Address Collection Flow:**
-1. Nova collects address components conversationally (street, suite/apt, city, state, zip)
-2. Reads back complete address for confirmation
-3. Calls `CollectAddressTool` to validate and store address
-4. Optionally asks about SMS confirmation
-5. Uses `SendSMSTool` to send formatted address via SMS
+**Address Collection & Validation Flow:**
+1. **Authentication**: Caller must complete OTP verification before updating address
+2. **Collection**: Nova collects address components conversationally (street, suite/apt, city, state, zip)
+3. **Confirmation**: Reads back complete address with street name spelled letter-by-letter
+4. **Storage**: Calls `CollectAddressTool` to store address components
+5. **Validation**: Calls `AddressValidationTool` which invokes SmartyStreets API via Lambda
+   - Returns validation status: valid, missing_secondary, ambiguous, suggestion, invalid
+   - Provides conversational responses for each scenario
+   - Returns standardized USPS address with ZIP+4
+6. **SMS Confirmation**: Optionally sends standardized address via SMS using `SendSMSTool`
+
+**Validation Scenarios:**
+- **Valid**: Address confirmed deliverable, proceed to SMS offer
+- **Missing Secondary**: Multi-unit building, request apartment/suite number
+- **Ambiguous**: Multiple matches found, present suggestions to caller
+- **Suggestion**: Similar address found, confirm correction with caller
+- **Invalid**: Address not found, ask caller to re-enter
 
 **SMS Capabilities:**
 - Send to caller's number (default) or alternate number provided
@@ -113,7 +125,11 @@ The gateway supports conversational address collection with optional SMS confirm
 **Configuration:**
 - Set `PINPOINT_APPLICATION_ID` environment variable
 - Set `PINPOINT_ORIGINATION_NUMBER` (defaults to +13682104244)
-- Enable prompt with `@tool collectAddressTool` and `@tool sendSMSTool`
+- Set `ADDRESS_VALIDATION_LAMBDA_URL` (Lambda Function URL from CDK deployment)
+- Enable tools in prompt: `@tool collectAddressTool`, `@tool addressValidationTool`, `@tool sendSMSTool`
+
+**SmartyStreets Lambda Deployment:**
+See `/infra/cdk-address-validation-lambda/README.md` for Lambda deployment instructions.
 
 ## Building
 

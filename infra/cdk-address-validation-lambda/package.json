@@ -1,0 +1,27 @@
+{
+  "name": "cdk-address-validation-lambda",
+  "version": "1.0.0",
+  "description": "CDK stack for SmartyStreets address validation Lambda with Function URL",
+  "bin": {
+    "cdk": "bin/cdk.js"
+  },
+  "scripts": {
+    "build": "echo 'No build step required'",
+    "cdk": "cdk"
+  },
+  "keywords": [
+    "cdk",
+    "lambda",
+    "address-validation",
+    "smartystreets"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "aws-cdk-lib": "^2.160.0",
+    "constructs": "^10.0.0"
+  },
+  "devDependencies": {
+    "aws-cdk": "^2.160.0"
+  }
+}
