@@ -1,203 +1,404 @@
-# Nova S2S VoIP Gateway
+# Nova S2S VoIP Gateway with Amazon Connect Integration
 
-This project contains an implementation of a SIP endpoint that acts as a gateway to Nova Sonic speech to speech.
-In other words, you can call a phone number and talk to Nova Sonic.
+This project implements a SIP endpoint that acts as a gateway to Amazon Nova Sonic speech-to-speech AI, with deep integration for Amazon Connect contact centers.
 
-<!-- TOC -->
-* [How does this work?](#how-does-this-work-)
-* [Getting started with ECS and CDK](#getting-started-with-ecs-and-cdk)
-* [Getting started with EC2](#getting-started-with-ec2)
-* [Third Party Dependencies of Note](#third-party-dependencies-of-note)
-* [Environment Variables](#environment-variables)
-* [Networking](#networking)
-* [Build](#build)
-* [Maven settings.xml](#maven-settingsxml)
-* [Developer Guide](#developer-guide)
-* [License](#license)
-<!-- TOC -->
+## What This Does
 
-Requirements:
-* A SIP account on a SIP server.  There are a number of options for this, whether it be a public VoIP provider or an account on your own PBX.
-* Your workstation should have Node.js installed.  This is required for CDK.  See https://nodejs.org/en/download.
-* Your workstation should have CDK installed.  See https://docs.aws.amazon.com/cdk/v2/guide/getting_started.html.
+**Voice Gateway:** Acts as a SIP user agent that bridges phone calls to Nova Sonic for natural voice conversations with AI.
 
-You should have some knowledge of Voice over IP (VoIP) and SIP.  
+**Connect Integration:** When called from Amazon Connect via External Voice Transfer, the gateway extracts contact context, updates contact attributes during/after the call, and returns control to Connect with routing instructions.
 
-Please be aware that this is just a proof of concept and shouldn't be considered production ready code.
-
-## How does this work?  
-
-This application acts as a SIP user agent.  When it starts it registers with a SIP server.  Upon receiving a call it will answer, establish the media session (over RTP), start a session with Nova Sonic, and bridge audio between RTP and Nova Sonic.  Audio received via RTP is sent to Nova Sonic and audio received from Nova Sonic is sent to the caller via RTP.
-
-![](flow.png)
-
-## Getting started with ECS and CDK
-
-This application can run in an EC2 backed ECS container running in host mode.  This enables it to bind large UDP port ranges that are required for RTP.  This guide details how to install using infrastructure as code with CDK.
-
-![](architecture.png)
-
-Additional Requirements:
-* Your workstation should have Docker installed and Docker should be running.  This is required to build the Docker image.  See https://docs.docker.com/get-started/get-docker/.
-
-Installation:
-1. Build the Maven project.  See the build section for details.
-2. Copy `target/s2s-voip-gateway-<version>.jar` to the docker/ directory. 
-3. Copy cdk-ecs/cdk.context.json.template to cdk-ecs/cdk.context.json
-4. Open cdk-ecs/cdk.context.json in your favorite text editor and set each of the configuration parameters.
-5. From a terminal run the following:
-   ```
-   cd cdk-ecs
-   npm install
-   cdk bootstrap
-   cdk deploy
-   ```
-6. Once the project is fully deployed try calling the phone number or extension for your SIP account.  The gateway should answer immediately and greet you.
-7. Converse with Nova Sonic. 
-
-What does this CDK stack do?
-* Create a VPC for your installation
-* Create VPC endpoints for Elastic Container Registry (ECR)
-* Create an Elastic Container Service (ECS) cluster
-* Create an auto-scaling group
-* Create task execution and task roles
-* Create secrets for your SIP credentials
-* Create a task and service for VoIP Gateway
-
-Clean-up:
-```
-cd cdk-ecs
-cdk destroy
-```
-
-## Getting started with EC2
-
-The Nova S2S VoIP Gateway can run in a configuration as simple as a single EC2 instance.  If you're doing development and testing changes this is the recommended approach.  
-
-We've included a CDK stack to create an EC2 instance with the proper permissions and security groups configured.  To install it, do the following:
-1. If you don't already have a keypair, create one from the EC2 console.  This is needed to authenticate to your instance.
-2. (optional) If you prefer to use an existing VPC, edit cdk-ec2-instance/bin/cdk.ts, uncomment the line with vpcId and update it to your existing VPC.  The VPC must have public subnets.
-3. Open cdk-ec2-instance/bin/cdk.ts in a text editor and update keyPairName to the name of the existing or newly created keypair.
-4. From a terminal run the following:
-   ```
-   cd cdk-ec2-instance
-   npm install
-   cdk bootstrap
-   cdk deploy
-   ```
-5. CDK will output the IP address of your newly created EC2 instance.
-
-What does this CDK stack do?
-* Create a new VPC for your instance (unless configured to use an existing one)  
-* Create an IAM role for your instance
-* Create security groups for your instance
-* Create the EC2 instance with Amazon Linux, configured to install a JDK (Amazon Corretto), Maven, and Git.
-
-To run the project:
-1. SSH into the EC2 instance using the keypair from step 1 of the installation guide and IP address from step 5.
-2. Copy the project from your local computer or git clone it to your EC2 instance.
-3. Configure your Maven settings.xml as detailed in the Maven settings.xml section.
-4. Run the project as follows: `./run.sh` (this will compile and execute the main class)
-5. Watch for the SIP registration.  Make sure it gets a 200 response.  If it doesn't your credentials may be incorrect.
-6. Call the phone number or extension for your SIP line.  The gateway should answer immediately and greet you.
-7. Converse with Nova Sonic.
-8. Hit Ctrl-C to exit.
-
-Clean-up:
-
-From a terminal run the following:
-   ```
-   cd cdk-ec2-instance
-   cdk destroy
-   ```
-
-## Third Party Dependencies of Note
-
-This project utilizes a fork of the mjSIP project, which can be found at https://github.com/haumacher/mjSIP, which is licensed under GPLv2.
-
-## Environment Variables
-
-This project can be configured to run via the `.mjsip-ua` configuration file OR by setting environment variables.  Below is a list of the environment variables in use:
-
-* AUTH_USER - username for authentication with SIP server
-* AUTH_PASSWORD - password for authentication with SIP server
-* AUTH_REALM - the SIP realm to use for authentication
-* DEBUG_SIP - true|false to enable/disable logging SIP packets
-* DISPLAY_NAME - the display name to send for your SIP address
-* GREETING_FILENAME - the name of the wav file to play as a greeting.  Can be an absolute path or in the classpath.
-* MEDIA_ADDRESS - the IP address to use for RTP media traffic.  By default it will source the address from your network interfaces.
-* MEDIA_PORT_BASE - the first RTP port to use for audio traffic
-* MEDIA_PORT_COUNT - the size of the RTP port pool used for audio traffic
-* NOVA_PROMPT - the prompt to use with Amazon Nova.  The default value can be found in NovaMediaConfig.java.
-* NOVA_VOICE_ID - the Amazon Nova Sonic voice to use.  See https://docs.aws.amazon.com/nova/latest/userguide/available-voices.html.  Default is matthew.
-* SIP_KEEPALIVE_TIME - frequency in milliseconds to send keep-alive packets
-* SIP_SERVER - the hostname or IP address of the SIP server to register with.  Required if running in environment variable mode.
-* SIP_USER - equivalent of sip-user from `.mjsip-ua`, generally the same as AUTH_USER
-* SIP_VIA_ADDR - the address to send in SIP packets for the Via field.  By default it will source the address from your network interfaces.
-
-If SIP_SERVER is set the application will pull configuration from environment variables.  If it is not set it will use the `.mjsip-ua` file.
-
-## Networking
-
-mjSIP doesn't contain any uPNP, ICE, or STUN capabilities, so it's necessary that your instance be configured with the proper security groups to allow VoIP traffic.
-
-Inbound rules:
-* Permit inbound UDP traffic on port 5060 (SIP port)
-* Permit inbound UDP traffic on port range 10000-20000 (RTP ephemeral ports).  The range can be set via the MEDIA_PORT_BASE and MEDIA_PORT_COUNT environment variables.  Set this to an appropriate value for your configuration.
-
-Outbound rules:
-* Permit all outbound.
-
-If you want to override addresses that are used with SIP traffic you can do so by running in environment variable mode.  See Environment Variables for more information on how to do this and what can be configured.
-
-## Build
-
-The Nova S2S VoIP Gateway is a Java Maven project.  As such it requires a JDK to build.  The project is configured for
-Java 9 compatibility, but can be built with much more recent releases.  Here are some options:
-* Corretto: https://aws.amazon.com/corretto
-* OpenJDK: https://developers.redhat.com/products/openjdk/overview
-* Oracle: https://www.oracle.com/java/technologies/downloads/
-
-Additionally, Apache Maven is required to do the build.  This can be downloaded from https://maven.apache.org/ or installed on Amazon Linux using the command `sudo yum install maven`.  Unzip Maven in a place where you'll be able to find it again. See "Maven settings.xml" below for details about configuring Maven.
-
-To build the project, open a terminal and cd to the project directory.  Run "mvn package" (you may need to put the full /path/to/maven/bin/mvn if the bin directory is not in your system PATH).
-
-Maven will build the project and create an s2s-voip-gateway*.jar file in the target/ directory.
-
-## Maven settings.xml
-
-mjSIP is distributed from a GitHub Maven repository.  Unfortunately, GitHub Maven repositories require credentials.  You will need to set up a classic API token with GitHub (https://github.com/settings/tokens), if you haven't already, and configure that in your ~/.m2/settings.xml file:
+## Repository Structure
 
 ```
-<?xml version="1.0" encoding="UTF-8"?>
-
-<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-    <servers>
-        <server>
-            <id>github</id>
-            <username>YOUR_USERNAME</username>
-            <password>YOUR_AUTH_TOKEN</password>
-        </server>
-    </servers>
-</settings>
+connect-nova-proxy/
+├── voice-gateway/           # Core SIP/RTP gateway (Dev A)
+│   ├── src/                # Java source code
+│   ├── docker/             # Container image
+│   ├── pom.xml             # Maven build
+│   └── README.md
+│
+├── connect-integration/     # Connect-specific code (Dev B)
+│   ├── src/                # SIP parser, attribute manager, tools
+│   ├── pom.xml
+│   └── README.md
+│
+├── infra/                   # CDK infrastructure (Dev B)
+│   ├── cdk-ecs/            # ECS deployment
+│   ├── cdk-ec2-instance/   # EC2 dev deployment
+│   └── README.md
+│
+├── lambdas/                 # Lambda functions (Dev B)
+│   └── prepareExternalTransfer/  # Sets SIP headers for Connect
+│
+├── shared/                  # Shared documentation
+│   ├── docs/               # Architecture docs
+│   │   ├── call-flow-sequence.md
+│   │   └── attribute-contract.md
+│   └── types/              # Shared type definitions
+│       └── CallDisposition.md
+│
+├── scripts/                 # Testing utilities
+│   ├── local-call-sim.sh   # SIP call simulator (Dev A)
+│   ├── push-attrs-test.js  # Connect API tester (Dev B)
+│   └── README.md
+│
+├── .claude/                 # Claude Code documentation
+│   └── IMPLEMENTATION_PLAN.md
+│
+└── .github/
+    └── workflows/
+        └── build-and-test.yml
 ```
 
-## Developer Guide
+## Quick Start
 
-The entrypoint for the application is NovaSonicVoipGateway.java.  This class contains a main method and configures the user agent based on what it finds in environment variables.
+### Prerequisites
 
-The main entry point for the Nova integration is in NovaStreamerFactory.java, where the Bedrock client is instantiated and the audio streams are established.
+- **Java 9+** (Amazon Corretto recommended)
+- **Maven 3.6+**
+- **Node.js 18+** (for CDK and Lambda)
+- **AWS Account** with Bedrock Nova Sonic access
+- **SIP Account** (VoIP provider or PBX)
+- **Amazon Connect Instance** (for Connect integration)
 
-By default, the gateway includes a toolset that gives Nova Sonic the ability to retrieve the date and time, but this can be extended to do much more.  The example tools can be found in com.example.s2s.voipgateway.nova.tools.
+### Build
 
-New tools can be developed by extending the AbstractNovaS2SEventHandler class and implementing the functionality you desire.  See the javadoc in AbstractNovaS2SEventHandler for more information.  An easy starting point for new tools would be to copy the DateTimeNovaS2SEventHandler to a new file, replacing the tools with something relevant to your use case.
+```bash
+# Build voice gateway
+cd voice-gateway
+mvn clean package
 
-The tool set is instantiated in NovaStreamerFactory.createMediaStreamer().  If you create new tools you'll need to update the NovaS2SEventHandler to instantiate your new class.
+# Build connect integration
+cd connect-integration
+mvn clean package
+```
 
+### Run Locally
 
+```bash
+# Configure environment
+cd voice-gateway
+cp environment.template environment
+# Edit environment with your SIP credentials
+
+# Run gateway
+./run.sh
+```
+
+### Deploy to AWS
+
+```bash
+# Option 1: ECS on EC2 (production)
+cd infra/cdk-ecs
+npm install
+cp cdk.context.json.template cdk.context.json
+# Edit cdk.context.json
+cdk deploy
+
+# Option 2: Single EC2 (development)
+cd infra/cdk-ec2-instance
+npm install
+# Edit bin/cdk.ts with key pair name
+cdk deploy
+```
+
+## Architecture
+
+### Standard SIP Call Flow
+```
+Caller → SIP Server → Gateway → Nova Sonic
+                         ↓
+                    Audio Bridge (RTP ↔ Bedrock)
+```
+
+### Amazon Connect Integration Flow
+```
+Customer → Connect Flow → Lambda (set headers)
+                            ↓
+                    External Transfer
+                            ↓
+                    Gateway (parse headers)
+                            ↓
+                    Nova Conversation
+                            ↓
+                    Update Contact Attributes
+                            ↓
+                    BYE (return to Connect)
+                            ↓
+                    Connect Flow (check attributes)
+                            ↓
+                    Route (agent/survey/end)
+```
+
+## Key Features
+
+### Voice Gateway (`/voice-gateway`)
+- ✅ SIP user agent with registration
+- ✅ RTP media handling (µ-law 8kHz)
+- ✅ Bidirectional audio streaming with Nova Sonic
+- ✅ Audio transcoding (µ-law ↔ PCM)
+- ✅ Extensible tool system for Nova
+- ✅ Docker containerization
+- ✅ Host-mode ECS deployment for UDP port binding
+
+### Connect Integration (`/connect-integration`)
+- 🚧 SIP header parsing (ContactId, InstanceId)
+- 🚧 Contact attribute management (UpdateContactAttributes API)
+- 🚧 Connect-aware Nova tools:
+  - `updateContactAttributes` - Mid-call attribute updates
+  - `endCallAndTransfer` - Graceful termination with routing
+- 🚧 Call context management
+- 🚧 Graceful fallback for non-Connect calls
+
+**Status:** 🚧 = Planned (see [Implementation Plan](./.claude/IMPLEMENTATION_PLAN.md))
+
+## Contact Attributes
+
+When used with Amazon Connect, the gateway sets these attributes:
+
+**Core Attributes:**
+- `nova_next` - Routing decision: `agent`, `survey`, or `end`
+- `nova_summary` - Conversation summary (plain text)
+- `nova_timestamp` - ISO-8601 timestamp
+
+**Routing Attributes:**
+- `nova_target_queue` - Queue name/ARN (if transferring to agent)
+- `nova_reason` - Reason code (e.g., `needs_agent`, `issue_resolved`)
+- `nova_call_duration` - Duration in seconds
+
+**Domain-Specific Attributes:**
+- `nova_customer_id`, `nova_account_number` - Customer identifiers
+- `nova_issue_type`, `nova_issue_subtype` - Issue categorization
+- `nova_customer_sentiment` - Detected sentiment
+
+See [Attribute Contract](./shared/docs/attribute-contract.md) for full specification.
+
+## Development Workflow
+
+### Dev A: Voice Gateway
+**Responsibilities:**
+- SIP/RTP stack
+- Audio transcoding
+- Nova Sonic integration
+- Base tool system
+- Media streaming
+
+**Testing:**
+```bash
+# Start gateway
+cd voice-gateway
+./run.sh
+
+# Simulate call (another terminal)
+cd scripts
+./local-call-sim.sh --with-connect-headers
+```
+
+### Dev B: Connect Integration
+**Responsibilities:**
+- SIP header parsing
+- Connect API integration
+- Connect-specific tools
+- Lambda functions
+- CDK infrastructure
+
+**Testing:**
+```bash
+# Test Connect API
+cd scripts
+node push-attrs-test.js \
+  --contact-id <test-id> \
+  --instance-id <instance-id> \
+  --test agent-transfer
+```
+
+### Working in Parallel
+
+The repository structure allows both developers to work independently:
+- **Dev A** works in `/voice-gateway` (Java, SIP, RTP)
+- **Dev B** works in `/connect-integration` and `/lambdas` (Java, TypeScript, Connect)
+- **Shared contract:** `/shared/docs/` defines interfaces
+- **Integration point:** `NovaSonicVoipGateway.createCallHandler()` (line 102)
+
+## Configuration
+
+### Environment Variables
+
+**SIP Configuration:**
+```bash
+SIP_SERVER=sip.example.com
+SIP_USER=gateway
+AUTH_USER=gateway
+AUTH_PASSWORD=secret
+AUTH_REALM=example.com
+DISPLAY_NAME="Nova Gateway"
+```
+
+**Nova Configuration:**
+```bash
+NOVA_VOICE_ID=en_us_matthew
+NOVA_PROMPT="You are a helpful assistant..."
+```
+
+**Connect Configuration:**
+```bash
+CONNECT_REGION=us-east-1
+CONNECT_INSTANCE_ID=12345678-1234-1234-1234-123456789012
+```
+
+**Media Configuration:**
+```bash
+MEDIA_PORT_BASE=10000
+MEDIA_PORT_COUNT=10000
+GREETING_FILENAME=hello.wav
+```
+
+See `voice-gateway/environment.template` for complete list.
+
+## IAM Permissions
+
+The gateway requires these AWS permissions:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:InvokeModel",
+        "bedrock:InvokeModelWithResponseStream"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "connect:UpdateContactAttributes"
+      ],
+      "Resource": "arn:aws:connect:*:*:instance/*/contact/*"
+    }
+  ]
+}
+```
+
+These are automatically configured in the CDK stacks.
+
+## Documentation
+
+- **[CLAUDE.md](./CLAUDE.md)** - Overview for Claude Code
+- **[Implementation Plan](./.claude/IMPLEMENTATION_PLAN.md)** - Detailed implementation roadmap
+- **[Call Flow Sequence](./shared/docs/call-flow-sequence.md)** - End-to-end call flow with sequence diagrams
+- **[Attribute Contract](./shared/docs/attribute-contract.md)** - Contact attribute specification
+- **[Voice Gateway README](./voice-gateway/README.md)** - Gateway module details
+- **[Connect Integration README](./connect-integration/README.md)** - Connect module details
+- **[Infrastructure README](./infra/README.md)** - Deployment options
+- **[Lambda README](./lambdas/prepareExternalTransfer/README.md)** - Lambda function details
+- **[Scripts README](./scripts/README.md)** - Testing utilities
+
+## Testing
+
+### Unit Tests
+```bash
+# Voice gateway
+cd voice-gateway
+mvn test
+
+# Connect integration
+cd connect-integration
+mvn test
+```
+
+### Integration Tests
+```bash
+# SIP call simulation
+cd scripts
+./local-call-sim.sh --with-connect-headers
+
+# Connect attribute updates
+node push-attrs-test.js \
+  --contact-id <id> \
+  --instance-id <id> \
+  --test mid-call
+```
+
+### CI/CD
+GitHub Actions automatically runs:
+- Maven build for both modules
+- Lambda packaging
+- CDK synth validation
+- Security scanning
+
+See [.github/workflows/build-and-test.yml](./.github/workflows/build-and-test.yml)
+
+## Troubleshooting
+
+### SIP Issues
+**Gateway not registering:**
+- Check `SIP_SERVER` is reachable
+- Verify credentials in environment
+- Enable `DEBUG_SIP=true` for packet logs
+
+**No audio on calls:**
+- Verify UDP ports 10000-20000 open
+- Check `MEDIA_ADDRESS` is correct (public IP if NAT)
+- Review security group rules
+
+### Connect Issues
+**Headers not appearing:**
+- Verify Lambda `prepareExternalTransfer` is invoked
+- Check Lambda logs in CloudWatch
+- Confirm Connect flow sets SIP headers from Lambda response
+
+**Attribute updates failing:**
+- Check IAM permissions for `connect:UpdateContactAttributes`
+- Verify contact ID is correct and contact is active
+- Review attribute size (< 32KB total)
+
+### Nova Issues
+**Bedrock connection fails:**
+- Check AWS credentials configured
+- Verify IAM permissions for Bedrock
+- Ensure region is `us-east-1` (Nova Sonic availability)
+
+## Production Considerations
+
+- **Scaling:** Use ECS auto-scaling based on active connections
+- **Monitoring:** CloudWatch metrics, logs, and alarms
+- **Security:** VPC endpoints, security groups, secrets management
+- **Cost:** ~$35-50/month for single t3.medium instance
+- **High Availability:** Multi-AZ deployment with ECS
+- **Disaster Recovery:** Automated CDK deployment, configuration in IaC
+
+## Third-Party Dependencies
+
+- **mjSIP** (2.0.5) - SIP stack, GPLv2 license
+- **AWS SDK v2** - Bedrock and Connect clients
+- **Jackson** - JSON processing
+- **Lombok** - Java boilerplate reduction
+- **Logback** - Logging
+
+See `pom.xml` files for complete dependency lists.
 
 ## License
 
-MIT-0 License.  See the LICENSE file for more details.
+MIT-0 License. See [LICENSE](./LICENSE) file.
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+
+## Support
+
+For issues and questions:
+- Check documentation in `/shared/docs/`
+- Review troubleshooting sections in module READMEs
+- Open GitHub issue with:
+  - Module affected (voice-gateway, connect-integration, etc.)
+  - Steps to reproduce
+  - Relevant logs (sanitize sensitive data)
+
+## Acknowledgments
+
+Based on the Amazon Nova Sonic S2S VoIP Gateway sample. Enhanced with Amazon Connect integration for enterprise contact center use cases.

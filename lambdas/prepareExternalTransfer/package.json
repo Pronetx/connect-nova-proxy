@@ -1,0 +1,19 @@
+{
+  "name": "prepare-external-transfer",
+  "version": "1.0.0",
+  "description": "Lambda function to prepare SIP headers for Amazon Connect external voice transfer",
+  "type": "module",
+  "main": "index.mjs",
+  "scripts": {
+    "test": "jest",
+    "deploy": "zip -r function.zip index.mjs package.json node_modules && aws lambda update-function-code --function-name prepareExternalTransfer --zip-file fileb://function.zip"
+  },
+  "dependencies": {
+    "@aws-sdk/client-connect": "^3.490.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "author": "Dev B",
+  "license": "MIT-0"
+}
