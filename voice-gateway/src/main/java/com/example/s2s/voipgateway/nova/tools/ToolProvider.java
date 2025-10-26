@@ -29,7 +29,9 @@ public class ToolProvider {
             TOOLS_PACKAGE + ".SendOTPTool",
             TOOLS_PACKAGE + ".VerifyOTPTool",
             TOOLS_PACKAGE + ".HangupTool",
-            TOOLS_PACKAGE + ".GetCallerPhoneTool"
+            TOOLS_PACKAGE + ".GetCallerPhoneTool",
+            TOOLS_PACKAGE + ".CollectAddressTool",
+            TOOLS_PACKAGE + ".SendSMSTool"
     );
 
     /**

@@ -84,8 +84,8 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
         log.info("Content ended: {} with reason: {}", contentId, stopReason);
 
         // Handle interruption - clear audio queue immediately for instant barge-in
-        if ("INTERRUPTION".equalsIgnoreCase(stopReason)) {
-            log.info("Interruption detected - clearing audio playback queue");
+        if (stopReason.toUpperCase().contains("INTERRUPT")) {
+            log.info("🔴🔴🔴 BARGE-IN DETECTED - stopReason: {} - Clearing audio playback queue 🔴🔴🔴", stopReason);
             audioStream.clearQueue();
         }
     }
@@ -95,6 +95,16 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
         log.info("Completion end for node: {}", node);
         String stopReason = node.has("stopReason") ? node.get("stopReason").asText() : "";
         log.info("Completion ended with reason: {}", stopReason);
+    }
+
+    @Override
+    public void handleUserInterrupt(JsonNode node) {
+        log.info("🔴 USER INTERRUPT - User started speaking (barge-in detected)");
+        log.info("Interrupt event details: {}", node);
+
+        // Clear audio playback queue immediately for instant barge-in response
+        log.info("Clearing audio playback queue due to user interrupt");
+        audioStream.clearQueue();
     }
 
     @Override

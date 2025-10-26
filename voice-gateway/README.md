@@ -69,13 +69,51 @@ voice-gateway/
 - `NovaS2SResponseHandler.java` - Processes Nova events
 
 ### 4. Tool System
-- Provide tools that Nova can invoke during conversation
-- Current tools: `getDateTool`, `getTimeTool`
-- Extensible architecture for adding custom tools
+- Modular tool architecture with auto-discovery
+- Tools are automatically registered via `ToolProvider.java`
+- Each tool implements the `Tool` interface with schema, description, and handler logic
 
-**Base class:** `AbstractNovaS2SEventHandler.java`
+**Current Tools:**
+- `DateTimeTool` - Provides current date and time
+- `SendOTPTool` - Generates and sends 4-digit OTP via SMS
+- `VerifyOTPTool` - Verifies OTP code from caller
+- `HangupTool` - Ends the call gracefully
+- `GetCallerPhoneTool` - Returns caller's phone number
+- `CollectAddressTool` - Collects and validates caller's address
+- `SendSMSTool` - Generic SMS sender for any message
 
-**Example:** `DateTimeNovaS2SEventHandler.java`
+**Architecture:**
+- `ToolProvider.java` - Central registry with auto-discovery
+- `ToolFactory.java` - Creates tool instances with dependency injection
+- `ToolRegistry.java` - Manages tool configuration for Nova
+- `ModularNovaS2SEventHandler.java` - Routes tool invocations
+
+**Adding New Tools:**
+1. Create a class implementing `Tool` interface
+2. Add class name to `ToolProvider.TOOL_CLASSES` list
+3. Tool is automatically discovered and registered
+
+### 5. Address Collection & SMS Messaging
+
+The gateway supports conversational address collection with optional SMS confirmation:
+
+**Address Collection Flow:**
+1. Nova collects address components conversationally (street, suite/apt, city, state, zip)
+2. Reads back complete address for confirmation
+3. Calls `CollectAddressTool` to validate and store address
+4. Optionally asks about SMS confirmation
+5. Uses `SendSMSTool` to send formatted address via SMS
+
+**SMS Capabilities:**
+- Send to caller's number (default) or alternate number provided
+- Generic `SendSMSTool` can send any message
+- Uses AWS Pinpoint for SMS delivery
+- Supports transactional messaging
+
+**Configuration:**
+- Set `PINPOINT_APPLICATION_ID` environment variable
+- Set `PINPOINT_ORIGINATION_NUMBER` (defaults to +13682104244)
+- Enable prompt with `@tool collectAddressTool` and `@tool sendSMSTool`
 
 ## Building
 

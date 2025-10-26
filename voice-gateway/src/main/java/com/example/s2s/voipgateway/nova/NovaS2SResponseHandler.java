@@ -128,6 +128,11 @@ public class NovaS2SResponseHandler implements InvokeModelWithBidirectionalStrea
                             usageEvent.has("totalTokens") ? usageEvent.get("totalTokens").asInt() : 0,
                             usageEvent.has("totalInputTokens") ? usageEvent.get("totalInputTokens").asInt() : 0,
                             usageEvent.has("totalOutputTokens") ? usageEvent.get("totalOutputTokens").asInt() : 0);
+                } else if (eventNode.has("userInterrupt")) {
+                    // Handle user interruption (barge-in)
+                    JsonNode interruptEvent = eventNode.get("userInterrupt");
+                    log.info("🔴 USER INTERRUPT DETECTED - Barge-in event: {}", interruptEvent);
+                    handler.handleUserInterrupt(interruptEvent);
                 } else {
                     log.info("Unhandled event: {}", eventNode);
                 }

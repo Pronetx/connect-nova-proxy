@@ -61,6 +61,12 @@ public interface NovaS2SEventHandler {
     void handleToolUse(JsonNode node, String toolUseId, String toolName, String content);
 
     /**
+     * Handles a userInterrupt event (barge-in).
+     * @param node The interrupt event data
+     */
+    void handleUserInterrupt(JsonNode node);
+
+    /**
      * Called when an error occurs.
      * @param e
      */
