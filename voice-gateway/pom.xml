@@ -122,5 +122,10 @@
             <artifactId>reactor-core</artifactId>
             <version>3.6.2</version>
         </dependency>
+        <dependency>
+            <groupId>ca.pjer</groupId>
+            <artifactId>logback-awslogs-appender</artifactId>
+            <version>1.6.0</version>
+        </dependency>
     </dependencies>
 </project>

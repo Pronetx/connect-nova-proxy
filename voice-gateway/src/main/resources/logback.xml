@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Console appender for local development -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- CloudWatch Logs appender -->
+    <appender name="CLOUDWATCH" class="ca.pjer.logback.AwsLogsAppender">
+        <!-- Log group name - will be created if it doesn't exist -->
+        <logGroupName>/aws/voip-gateway/application</logGroupName>
+
+        <!-- Log stream name - uses instance ID from EC2 metadata or hostname as fallback -->
+        <logStreamName>${INSTANCE_ID:-${HOSTNAME:-local}}</logStreamName>
+
+        <!-- Region - will use default provider chain (instance profile, env vars, etc.) -->
+        <logRegion>us-east-1</logRegion>
+
+        <!-- Layout for CloudWatch logs -->
+        <layout>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </layout>
+
+        <!-- Batch size for efficiency -->
+        <maxBatchLogEvents>50</maxBatchLogEvents>
+
+        <!-- Flush interval in milliseconds -->
+        <maxFlushTimeMillis>5000</maxFlushTimeMillis>
+
+        <!-- Queue size -->
+        <maxBlockTimeMillis>5000</maxBlockTimeMillis>
+    </appender>
+
+    <!-- Async wrapper for CloudWatch to avoid blocking -->
+    <appender name="ASYNC_CLOUDWATCH" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="CLOUDWATCH" />
+        <queueSize>500</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <includeCallerData>false</includeCallerData>
+    </appender>
+
+    <!-- Application loggers -->
+    <logger name="com.example.s2s.voipgateway" level="INFO" />
+
+    <!-- Nova integration - set to DEBUG for detailed event flow -->
+    <logger name="com.example.s2s.voipgateway.nova" level="INFO" />
+
+    <!-- mjSIP library - can be noisy, set to WARN -->
+    <logger name="org.mjsip" level="WARN" />
+
+    <!-- AWS SDK - typically noisy, set to WARN -->
+    <logger name="software.amazon.awssdk" level="WARN" />
+
+    <!-- Netty (used by AWS SDK) - very noisy, set to WARN -->
+    <logger name="io.netty" level="WARN" />
+
+    <!-- Root logger -->
+    <root level="INFO">
+        <appender-ref ref="STDOUT" />
+        <appender-ref ref="ASYNC_CLOUDWATCH" />
+    </root>
+</configuration>

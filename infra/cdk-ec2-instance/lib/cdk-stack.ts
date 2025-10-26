@@ -53,6 +53,20 @@ export class VoipGatewayEC2Stack extends cdk.Stack {
               effect: iam.Effect.ALLOW
             })
           ]
+        }),
+        'CloudWatchLogsAccess': new iam.PolicyDocument({
+          statements: [
+            new iam.PolicyStatement({
+              actions: [
+                'logs:CreateLogGroup',
+                'logs:CreateLogStream',
+                'logs:PutLogEvents',
+                'logs:DescribeLogStreams'
+              ],
+              resources: ['arn:aws:logs:*:*:log-group:/aws/voip-gateway/*'],
+              effect: iam.Effect.ALLOW
+            })
+          ]
         })
       },
     });
@@ -103,13 +117,45 @@ export class VoipGatewayEC2Stack extends cdk.Stack {
       role: instanceRole,
     });
 
-    // Add commands to the user data to install Java and SSM agent
+    // Add commands to the user data to install Java, SSM agent, and CloudWatch agent
     instance.userData.addCommands(
       '#!/bin/bash',
       'yum update -y',
-      'yum install -y java-24-amazon-corretto-devel maven git amazon-ssm-agent',
+      'yum install -y java-24-amazon-corretto-devel maven git amazon-ssm-agent amazon-cloudwatch-agent',
       'systemctl enable amazon-ssm-agent',
       'systemctl start amazon-ssm-agent',
+      '',
+      '# Get instance ID and set as environment variable for log stream naming',
+      'INSTANCE_ID=$(ec2-metadata --instance-id | cut -d " " -f 2)',
+      'echo "export INSTANCE_ID=$INSTANCE_ID" >> /etc/environment',
+      '',
+      '# Create CloudWatch agent configuration',
+      'cat > /opt/aws/amazon-cloudwatch-agent/etc/config.json << EOF',
+      '{',
+      '  "logs": {',
+      '    "logs_collected": {',
+      '      "files": {',
+      '        "collect_list": [',
+      '          {',
+      '            "file_path": "/home/ec2-user/gateway.log",',
+      '            "log_group_name": "/aws/voip-gateway/system",',
+      '            "log_stream_name": "{instance_id}/gateway.log",',
+      '            "retention_in_days": 7',
+      '          }',
+      '        ]',
+      '      }',
+      '    }',
+      '  }',
+      '}',
+      'EOF',
+      '',
+      '# Start CloudWatch agent',
+      '/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \\',
+      '  -a fetch-config \\',
+      '  -m ec2 \\',
+      '  -s \\',
+      '  -c file:/opt/aws/amazon-cloudwatch-agent/etc/config.json',
+      '',
       'echo "Dependency installation completed"'
     );
 
