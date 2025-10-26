@@ -5,6 +5,7 @@ import com.example.s2s.voipgateway.constants.SonicAudioConfig;
 import com.example.s2s.voipgateway.constants.SonicAudioTypes;
 import com.example.s2s.voipgateway.nova.event.*;
 import com.example.s2s.voipgateway.nova.tools.ModularNovaS2SEventHandler;
+import com.example.s2s.voipgateway.nova.tools.PromptConfiguration;
 import com.example.s2s.voipgateway.NovaMediaConfig;
 import com.example.s2s.voipgateway.NovaSonicAudioInput;
 import com.example.s2s.voipgateway.NovaSonicAudioOutput;
@@ -66,16 +67,38 @@ public class NovaStreamerFactory implements StreamerFactory {
             callerPhone = "+10000000000"; // Default placeholder
         }
 
-        ModularNovaS2SEventHandler eventHandler = new ModularNovaS2SEventHandler(callerPhone);
+        // Load prompt configuration from environment variable or use default
+        String promptConfigPath = System.getenv().getOrDefault("NOVA_PROMPT_FILE", "prompts/default.prompt");
+        PromptConfiguration promptConfig = null;
+        String systemPrompt = mediaConfig.getNovaPrompt();
+
+        try {
+            promptConfig = PromptConfiguration.fromResource(promptConfigPath);
+            systemPrompt = promptConfig.getSystemPrompt();
+            log.info("Loaded prompt configuration from: {}", promptConfigPath);
+            log.info("Enabled tools: {}", promptConfig.getToolNames());
+        } catch (Exception e) {
+            log.warn("Failed to load prompt configuration from {}: {}. Using default configuration.",
+                    promptConfigPath, e.getMessage());
+        }
+
+        // Create event handler with prompt config if available, otherwise use all tools
+        ModularNovaS2SEventHandler eventHandler;
+        if (promptConfig != null) {
+            eventHandler = new ModularNovaS2SEventHandler(callerPhone, promptConfig);
+        } else {
+            eventHandler = new ModularNovaS2SEventHandler(callerPhone);
+        }
+
         eventHandler.setSessionId(promptName);
         eventHandler.setHangupCallback(mediaConfig.getHangupCallback());
 
-        log.info("Using system prompt: {}", mediaConfig.getNovaPrompt());
+        log.info("Using system prompt: {}", systemPrompt);
 
         InteractObserver<NovaSonicEvent> inputObserver = novaClient.interactMultimodal(
                 createSessionStartEvent(),
                 createPromptStartEvent(promptName, eventHandler),
-                createSystemPrompt(promptName, mediaConfig.getNovaPrompt()),
+                createSystemPrompt(promptName, systemPrompt),
                 eventHandler);
 
         eventHandler.setOutbound(inputObserver);
