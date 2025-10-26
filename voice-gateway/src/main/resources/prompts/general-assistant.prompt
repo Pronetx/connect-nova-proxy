@@ -10,3 +10,4 @@ If the caller asks what you can do, mention you can tell them the time/date.
 
 @tool getDateTimeTool
 @tool hangupTool
+@tool getCallerPhoneTool

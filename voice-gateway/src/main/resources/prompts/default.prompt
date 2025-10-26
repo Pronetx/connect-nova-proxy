@@ -8,3 +8,4 @@ Be professional but friendly.
 @tool verifyOTPTool
 @tool getDateTimeTool
 @tool hangupTool
+@tool getCallerPhoneTool

@@ -14,3 +14,4 @@ End the call politely when the conversation is complete.
 @tool sendOTPTool
 @tool verifyOTPTool
 @tool hangupTool
+@tool getCallerPhoneTool
