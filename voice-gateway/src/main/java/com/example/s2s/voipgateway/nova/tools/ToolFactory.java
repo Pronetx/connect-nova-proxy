@@ -5,13 +5,9 @@ import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.pinpoint.PinpointClient;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 /**
  * Factory for auto-discovering and creating tool instances.
@@ -39,52 +35,15 @@ public class ToolFactory {
     }
 
     /**
-     * Discovers all Tool implementations in the tools package.
-     * @return List of discovered tool class names
+     * Discovers all Tool implementations using ToolProvider.
+     * The ToolProvider maintains a list of known tools and instantiates them with dependency injection.
+     * @return List of discovered Tool instances
      */
-    public List<String> discoverToolClasses() {
-        List<String> toolClasses = new ArrayList<>();
-
-        try {
-            // Get all classes in the tools package
-            String packagePath = TOOLS_PACKAGE.replace('.', '/');
-            ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-            InputStream stream = classLoader.getResourceAsStream(packagePath);
-
-            if (stream == null) {
-                log.warn("Could not find tools package: {}", packagePath);
-                return toolClasses;
-            }
-
-            BufferedReader reader = new BufferedReader(new InputStreamReader(stream));
-            Set<String> classNames = reader.lines()
-                    .filter(line -> line.endsWith(".class"))
-                    .map(line -> line.substring(0, line.lastIndexOf('.')))
-                    .collect(Collectors.toSet());
-
-            for (String className : classNames) {
-                String fullClassName = TOOLS_PACKAGE + "." + className;
-
-                try {
-                    Class<?> clazz = Class.forName(fullClassName);
-
-                    // Check if it implements Tool and is not an interface
-                    if (Tool.class.isAssignableFrom(clazz) && !clazz.isInterface() && clazz != Tool.class) {
-                        toolClasses.add(fullClassName);
-                        log.debug("Discovered tool class: {}", fullClassName);
-                    }
-                } catch (ClassNotFoundException | NoClassDefFoundError e) {
-                    log.debug("Could not load class {}: {}", fullClassName, e.getMessage());
-                }
-            }
-
-            reader.close();
-        } catch (Exception e) {
-            log.error("Error discovering tool classes", e);
-        }
-
-        log.info("Discovered {} tool classes", toolClasses.size());
-        return toolClasses;
+    public List<Tool> discoverTools() {
+        ToolProvider provider = new ToolProvider();
+        List<Tool> tools = provider.createAllTools(phoneNumber, pinpointClient, otpStore);
+        log.info("Discovered {} tools via ToolProvider", tools.size());
+        return tools;
     }
 
     /**
@@ -135,22 +94,11 @@ public class ToolFactory {
     }
 
     /**
-     * Creates all discovered tools.
+     * Creates all discovered tools using ToolProvider.
      * @return List of all tool instances
      */
     public List<Tool> createAllTools() {
-        List<Tool> tools = new ArrayList<>();
-        List<String> toolClasses = discoverToolClasses();
-
-        for (String className : toolClasses) {
-            Tool tool = createTool(className);
-            if (tool != null) {
-                tools.add(tool);
-            }
-        }
-
-        log.info("Created {} tools", tools.size());
-        return tools;
+        return discoverTools();
     }
 
     /**
