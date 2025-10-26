@@ -56,7 +56,20 @@ public class NovaS2SBedrockInteractClient {
 
         // if the request fails make sure to tell the publisher to close down properly
         completableFuture.exceptionally(throwable -> {
-            log.error("Bedrock error:", throwable);
+            log.error("Bedrock streaming error occurred", throwable);
+
+            // Log specific error types for better troubleshooting
+            String errorMsg = throwable.getMessage();
+            if (errorMsg != null) {
+                if (errorMsg.contains("ValidationException")) {
+                    log.error("Nova Sonic validation error - likely session state mismatch");
+                } else if (errorMsg.contains("ThrottlingException")) {
+                    log.error("Bedrock throttling - too many requests");
+                } else if (errorMsg.contains("ServiceUnavailableException")) {
+                    log.error("Bedrock service temporarily unavailable");
+                }
+            }
+
             publisher.onError(throwable);
             return null;
         });

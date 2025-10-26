@@ -65,7 +65,19 @@ public class NovaS2SResponseHandler implements InvokeModelWithBidirectionalStrea
 
     @Override
     public void exceptionOccurred(Throwable t) {
-        log.error("Event stream error, exception occurred", t);
+        log.error("Event stream exception occurred", t);
+
+        // Provide context for common errors
+        String errorMsg = t.getMessage();
+        if (errorMsg != null) {
+            if (errorMsg.contains("No open content found")) {
+                log.error("Content state error: Nova expected content that wasn't properly opened");
+                log.error("This typically indicates a streaming protocol violation or timing issue");
+            } else if (errorMsg.contains("GOAWAY")) {
+                log.error("HTTP/2 connection closed by server - possible timeout or service restart");
+            }
+        }
+
         handler.onError(new Exception(t));
     }
 

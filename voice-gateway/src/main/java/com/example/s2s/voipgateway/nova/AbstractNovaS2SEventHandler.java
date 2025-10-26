@@ -106,12 +106,20 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
 
     @Override
     public void onError(Exception e) {
+        log.error("Nova S2S error occurred", e);
+
+        // Check if this is a validation error related to content
+        String errorMessage = e.getMessage();
+        if (errorMessage != null && errorMessage.contains("No open content found")) {
+            log.error("Content validation error detected - Nova session out of sync");
+        }
+
         if (!playedErrorSound) {
             try {
                 playAudioFile(ERROR_AUDIO_FILE);
                 playedErrorSound = true;
             } catch (FileNotFoundException ex) {
-                log.error("Failed to play error audio file", ex);
+                log.warn("{} not found, no error audio will be played", ERROR_AUDIO_FILE);
             }
         }
     }
