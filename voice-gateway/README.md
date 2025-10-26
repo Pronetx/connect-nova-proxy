@@ -112,6 +112,26 @@ make build
 make run
 ```
 
+## Deployment Scripts
+
+For deploying to EC2 instances, see [scripts/README.md](scripts/README.md).
+
+Quick deployment:
+```bash
+# First time setup
+./scripts/configure-environment.sh  # Configure environment variables
+./scripts/setup-service.sh          # Create systemd service
+
+# Subsequent deployments
+./scripts/build-and-deploy.sh       # Build and deploy
+
+# Monitoring
+./scripts/status.sh                 # Check service status
+./scripts/logs.sh                   # View logs
+```
+
+All scripts support deploying to multiple EC2 instances tagged with `NovaSonicVoIPGatewayInstance`.
+
 ## Configuration
 
 ### Environment Variables
