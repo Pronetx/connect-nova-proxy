@@ -12,8 +12,9 @@
         <!-- Log group name - will be created if it doesn't exist -->
         <logGroupName>/aws/voip-gateway/application</logGroupName>
 
-        <!-- Log stream name - uses instance ID from EC2 metadata or hostname as fallback -->
-        <logStreamName>${INSTANCE_ID:-${HOSTNAME:-local}}</logStreamName>
+        <!-- Log stream name - creates new stream per instance + startup time for manageable log sizes -->
+        <!-- Format: instance-id/YYYY-MM-DD/startup-timestamp -->
+        <logStreamName>${INSTANCE_ID:-${HOSTNAME:-local}}/%d{yyyy-MM-dd}/${START_TIME:-startup}</logStreamName>
 
         <!-- Region - will use default provider chain (instance profile, env vars, etc.) -->
         <logRegion>us-west-2</logRegion>
