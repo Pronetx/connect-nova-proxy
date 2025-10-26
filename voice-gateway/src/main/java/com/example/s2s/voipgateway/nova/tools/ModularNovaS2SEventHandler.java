@@ -37,7 +37,7 @@ public class ModularNovaS2SEventHandler extends AbstractNovaS2SEventHandler {
     }
 
     /**
-     * Initializes the default OTP and hangup tools.
+     * Initializes the default tools (OTP, DateTime, Hangup).
      * @param phoneNumber The caller's phone number
      */
     private void initializeDefaultTools(String phoneNumber) {
@@ -55,6 +55,9 @@ public class ModularNovaS2SEventHandler extends AbstractNovaS2SEventHandler {
         // Register OTP tools
         toolRegistry.register(new SendOTPTool(pinpointClient, phoneNumber, otpStore));
         toolRegistry.register(new VerifyOTPTool(otpStore));
+
+        // Register DateTime tool
+        toolRegistry.register(new DateTimeTool());
 
         // Register hangup tool
         toolRegistry.register(new HangupTool());

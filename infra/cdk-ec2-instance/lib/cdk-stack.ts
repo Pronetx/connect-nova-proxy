@@ -67,6 +67,34 @@ export class VoipGatewayEC2Stack extends cdk.Stack {
               effect: iam.Effect.ALLOW
             })
           ]
+        }),
+        'CloudWatchMetricsAccess': new iam.PolicyDocument({
+          statements: [
+            new iam.PolicyStatement({
+              actions: [
+                'cloudwatch:PutMetricData'
+              ],
+              resources: ['*'],
+              effect: iam.Effect.ALLOW,
+              conditions: {
+                'StringEquals': {
+                  'cloudwatch:namespace': 'NovaGateway/Usage'
+                }
+              }
+            })
+          ]
+        }),
+        'PinpointSMSAccess': new iam.PolicyDocument({
+          statements: [
+            new iam.PolicyStatement({
+              actions: [
+                'mobiletargeting:SendMessages',
+                'mobiletargeting:GetApp'
+              ],
+              resources: ['*'],
+              effect: iam.Effect.ALLOW
+            })
+          ]
         })
       },
     });
