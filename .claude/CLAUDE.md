@@ -28,15 +28,41 @@ The application has three main integration points:
 
 ## Tool Extension System
 
-Nova Sonic can be extended with custom tools/functions. The current implementation includes a DateTime tool example.
+Nova Sonic can be extended with custom tools/functions. The current implementation includes DateTime and Hangup tools.
 
-To add new tools:
+### Available Built-in Tools
+
+**DateTimeNovaS2SEventHandler** (`com.example.s2s.voipgateway.nova.tools.DateTimeNovaS2SEventHandler`):
+- `getDateTool` - Provides current date information (timezone, year, month, day, day of week)
+- `getTimeTool` - Provides current time information (timezone, formatted time)
+- `hangupTool` - Allows Nova to terminate the call when conversation is complete or user requests to hang up
+
+### Adding New Tools
+
+To add custom tools:
 1. Extend `AbstractNovaS2SEventHandler` class
-2. Implement `handleToolInvocation()` method
+2. Implement `handleToolInvocation()` method to process tool calls
 3. Define tool specifications in your handler's `getToolConfiguration()`
 4. Instantiate your handler in `NovaStreamerFactory.createMediaStreamer()` (currently line 61 instantiates `DateTimeNovaS2SEventHandler`)
 
-Example tool: `com.example.s2s.voipgateway.nova.tools.DateTimeNovaS2SEventHandler`
+### Tool Implementation Pattern
+
+Tools follow the Nova Sonic event protocol:
+1. Register tool in `PromptStartEvent.ToolConfiguration` with name, description, and input schema
+2. Nova emits `toolUse` event when invoking the tool
+3. Handler detects `toolUse` in response stream and calls `handleToolInvocation()`
+4. Handler sends `toolResult` event back to Nova with results
+5. For tools requiring SIP-level actions (like hangup), use callback pattern via `NovaMediaConfig`
+
+### Hangup Tool Implementation
+
+The hangup tool demonstrates the callback pattern for bridging architectural layers:
+- **Callback Setup**: `NovaSonicVoipGateway.onUaIncomingCall()` sets `mediaConfig.setHangupCallback(() -> ua.hangup())`
+- **Callback Threading**: `NovaStreamerFactory` passes callback to event handler via `eventHandler.setHangupCallback()`
+- **Callback Invocation**: `handleHangupTool()` invokes callback after 3-second delay to allow Nova to say goodbye
+- **Result**: Properly terminates SIP session with BYE message
+
+This pattern allows event handlers deep in the streaming layer to trigger actions at the SIP layer.
 
 ## Development Commands
 

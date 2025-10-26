@@ -15,6 +15,8 @@ public class NovaMediaConfig extends MediaConfig {
     private int novaMaxTokens = DEFAULT_MAX_TOKENS;
     private float novaTopP = DEFAULT_NOVA_TOP_P;
     private float novaTemperature = DEFAULT_NOVA_TEMPERATURE;
+    private String callerPhoneNumber;
+    private Runnable hangupCallback;
 
     public String getNovaVoiceId() {
         return novaVoiceId;
@@ -54,5 +56,21 @@ public class NovaMediaConfig extends MediaConfig {
 
     public void setNovaTemperature(float novaTemperature) {
         this.novaTemperature = novaTemperature;
+    }
+
+    public String getCallerPhoneNumber() {
+        return callerPhoneNumber;
+    }
+
+    public void setCallerPhoneNumber(String callerPhoneNumber) {
+        this.callerPhoneNumber = callerPhoneNumber;
+    }
+
+    public Runnable getHangupCallback() {
+        return hangupCallback;
+    }
+
+    public void setHangupCallback(Runnable hangupCallback) {
+        this.hangupCallback = hangupCallback;
     }
 }

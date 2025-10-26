@@ -105,7 +105,19 @@ public class NovaSonicVoipGateway extends RegisteringMultipleUAS {
             @Override
             public void onUaIncomingCall(UserAgent ua, NameAddress callee, NameAddress caller,
                                          MediaDesc[] media_descs) {
-                LOG.info("Incomming call from: {}", callee.getAddress());
+                LOG.info("Incomming call from: {}", caller.getAddress());
+
+                // Extract caller phone number and store in config
+                String callerPhone = extractPhoneNumber(caller.getAddress().toString());
+                mediaConfig.setCallerPhoneNumber(callerPhone);
+                LOG.info("Caller phone number: {}", callerPhone);
+
+                // Set hangup callback to terminate the call when Nova requests it
+                mediaConfig.setHangupCallback(() -> {
+                    LOG.info("Hangup callback triggered - terminating call");
+                    ua.hangup();
+                });
+
                 MediaDesc[] mediaDescs = mediaConfig.getMediaDescs();
                 if (mediaDescs == null || mediaDescs.length == 0) {
                     mediaDescs = createDefaultMediaDescs();
@@ -180,6 +192,34 @@ public class NovaSonicVoipGateway extends RegisteringMultipleUAS {
         if (isConfigured(environ.get("SIP_VIA_ADDR"))) {
             sipConfig.setViaAddrIPv4(environ.get("SIP_VIA_ADDR"));
         }
+    }
+
+    /**
+     * Extracts phone number from SIP URI.
+     * Converts "sip:+14155551234@host" to "+1 (415) 555-1234"
+     */
+    private static String extractPhoneNumber(String sipUri) {
+        // Extract the number from SIP URI (between "sip:" and "@")
+        String number = sipUri;
+        if (sipUri.startsWith("sip:")) {
+            number = sipUri.substring(4);
+        }
+        int atIndex = number.indexOf('@');
+        if (atIndex > 0) {
+            number = number.substring(0, atIndex);
+        }
+
+        // Format the number if it looks like E.164 (+1XXXXXXXXXX)
+        if (number.startsWith("+1") && number.length() == 12) {
+            // +14155551234 -> +1 (415) 555-1234
+            return String.format("+%s (%s) %s-%s",
+                number.substring(1, 2),
+                number.substring(2, 5),
+                number.substring(5, 8),
+                number.substring(8, 12));
+        }
+
+        return number; // Return as-is if not standard format
     }
 
     /**

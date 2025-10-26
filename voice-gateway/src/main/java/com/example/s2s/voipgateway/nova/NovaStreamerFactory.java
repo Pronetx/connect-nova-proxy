@@ -58,7 +58,8 @@ public class NovaStreamerFactory implements StreamerFactory {
         String promptName = UUID.randomUUID().toString();
 
         NovaS2SBedrockInteractClient novaClient = new NovaS2SBedrockInteractClient(client, "amazon.nova-sonic-v1:0");
-        NovaS2SEventHandler eventHandler = new DateTimeNovaS2SEventHandler();
+        DateTimeNovaS2SEventHandler eventHandler = new DateTimeNovaS2SEventHandler();
+        eventHandler.setHangupCallback(mediaConfig.getHangupCallback());
 
         log.info("Using system prompt: {}", mediaConfig.getNovaPrompt());
 
@@ -119,11 +120,18 @@ public class NovaStreamerFactory implements StreamerFactory {
      * @param systemPrompt The system prompt.
      * @return The system prompt as a TextInputEvent.
      */
-    private static TextInputEvent createSystemPrompt(String promptName, String systemPrompt) {
+    private TextInputEvent createSystemPrompt(String promptName, String systemPrompt) {
+        // Append caller phone number to system prompt if available
+        String enhancedPrompt = systemPrompt;
+        if (mediaConfig.getCallerPhoneNumber() != null && !mediaConfig.getCallerPhoneNumber().isEmpty()) {
+            enhancedPrompt = systemPrompt + "\n\nThe caller's phone number is: " + mediaConfig.getCallerPhoneNumber() + "When the caller asks you to repeat their phone number, this is the number you would repeat.";
+            log.info("Enhanced system prompt with caller phone number: {}", mediaConfig.getCallerPhoneNumber());
+        }
+
         return new TextInputEvent(TextInputEvent.TextInput.builder()
                 .promptName(promptName)
                 .contentName(UUID.randomUUID().toString())
-                .content(systemPrompt)
+                .content(enhancedPrompt)
                 .role(ROLE_SYSTEM)
                 .build());
     }

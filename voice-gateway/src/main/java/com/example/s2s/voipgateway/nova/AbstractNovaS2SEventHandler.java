@@ -79,6 +79,12 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
         String contentId = node.get("contentId").asText();
         String stopReason = node.has("stopReason") ? node.get("stopReason").asText() : "";
         log.info("Content ended: {} with reason: {}", contentId, stopReason);
+
+        // Handle interruption - clear audio queue immediately for instant barge-in
+        if ("INTERRUPTION".equalsIgnoreCase(stopReason)) {
+            log.info("Interruption detected - clearing audio playback queue");
+            audioStream.clearQueue();
+        }
     }
 
     @Override

@@ -98,4 +98,14 @@ public class QueuedUlawInputStream extends InputStream {
     @Override
     public synchronized void reset() throws IOException {
     }
+
+    /**
+     * Clears the audio queue immediately. Used for barge-in/interruption handling.
+     */
+    public void clearQueue() {
+        log.info("Clearing audio queue for interruption - {} chunks discarded", queue.size());
+        queue.clear();
+        currentChunk = null;
+        currentIndex = -1;
+    }
 }
