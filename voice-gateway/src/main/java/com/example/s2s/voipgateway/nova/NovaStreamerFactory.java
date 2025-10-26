@@ -4,7 +4,7 @@ import com.example.s2s.voipgateway.constants.MediaTypes;
 import com.example.s2s.voipgateway.constants.SonicAudioConfig;
 import com.example.s2s.voipgateway.constants.SonicAudioTypes;
 import com.example.s2s.voipgateway.nova.event.*;
-import com.example.s2s.voipgateway.nova.tools.OTPNovaS2SEventHandler;
+import com.example.s2s.voipgateway.nova.tools.ModularNovaS2SEventHandler;
 import com.example.s2s.voipgateway.NovaMediaConfig;
 import com.example.s2s.voipgateway.NovaSonicAudioInput;
 import com.example.s2s.voipgateway.NovaSonicAudioOutput;
@@ -66,7 +66,7 @@ public class NovaStreamerFactory implements StreamerFactory {
             callerPhone = "+10000000000"; // Default placeholder
         }
 
-        OTPNovaS2SEventHandler eventHandler = new OTPNovaS2SEventHandler(callerPhone);
+        ModularNovaS2SEventHandler eventHandler = new ModularNovaS2SEventHandler(callerPhone);
         eventHandler.setSessionId(promptName);
         eventHandler.setHangupCallback(mediaConfig.getHangupCallback());
 
