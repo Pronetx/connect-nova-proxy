@@ -156,9 +156,95 @@ Note: mjSIP lacks uPNP/ICE/STUN; instance needs public IP or proper NAT configur
 - **Tool results**: JSON-serialized, sent via `ToolResultEvent`
 - **Dependencies**: Lombok for boilerplate reduction, Jackson for JSON, RxJava/Reactor for reactive streams
 
+## Deployment Guide (EC2 with Chime Voice Connector)
+
+### Prerequisites
+1. Build mjSIP locally and install to Maven repository:
+   ```bash
+   git clone https://github.com/haumacher/mjSIP.git
+   cd mjSIP
+   mvn clean install -DskipTests
+   ```
+
+2. Build voice gateway JAR:
+   ```bash
+   cd voice-gateway
+   mvn clean package -DskipTests
+   ```
+
+3. Deploy EC2 instance with CDK:
+   ```bash
+   cd infra/cdk-ec2-instance
+   npm install
+   cdk deploy
+   ```
+
+### Chime Voice Connector Setup
+
+1. **Disable Encryption**: Voice Connector must have encryption disabled since mjSIP doesn't support TLS/SRTP:
+   ```bash
+   aws chime-sdk-voice update-voice-connector \
+     --voice-connector-id <ID> \
+     --encryption Disabled
+   ```
+
+2. **Configure Origination**: Route inbound calls to gateway EC2 instance:
+   - Protocol: UDP
+   - Host: EC2 Elastic IP
+   - Port: 5060
+   - Priority: 1
+   - Weight: 1
+
+### Gateway Configuration
+
+Create `/home/ec2-user/.mjsip-ua` on EC2 instance:
+```properties
+# Inbound trunk mode - no registration required
+do_register=false
+via-addr=<EC2_ELASTIC_IP>
+host-port=5060
+media-port=10000
+port-count=10000
+no-prompt=yes
+log-all-packets=yes
+```
+
+### Deploy and Start Gateway
+
+```bash
+# Upload JAR to S3
+aws s3 cp target/s2s-voip-gateway-*.jar s3://<deployment-bucket>/
+
+# Download on EC2 (via SSM)
+aws ssm send-command \
+  --instance-ids <INSTANCE_ID> \
+  --document-name "AWS-RunShellScript" \
+  --parameters 'commands=["cd /home/ec2-user && aws s3 cp s3://<bucket>/s2s-voip-gateway-*.jar ."]'
+
+# Start gateway with us-east-1 region for Nova Sonic
+aws ssm send-command \
+  --instance-ids <INSTANCE_ID> \
+  --document-name "AWS-RunShellScript" \
+  --parameters 'commands=["cd /home/ec2-user && AWS_REGION=us-east-1 nohup java -jar s2s-voip-gateway-*.jar > gateway.log 2>&1 &"]'
+```
+
+### Troubleshooting
+
+**Issue**: Call connects but stays ringing forever
+**Cause**: Missing SDP media descriptor in 200 OK response
+**Solution**: Fixed in `NovaSonicVoipGateway.java:101-118` - now falls back to `createDefaultMediaDescs()` when config file mode is used
+
+**Issue**: TLS/SRTP encryption errors
+**Cause**: Voice Connector encryption enabled
+**Solution**: Disable encryption on Voice Connector (see above)
+
+**Issue**: Wrong AWS region for Bedrock
+**Solution**: Always set `AWS_REGION=us-east-1` when starting gateway (Nova Sonic only available in us-east-1)
+
 ## Important Notes
 
 - This is a **proof of concept** - not production-ready
 - The application uses **host network mode** in ECS deployments to bind large UDP port ranges
-- GitHub Maven credentials required for mjSIP dependency
+- GitHub Maven credentials required for mjSIP dependency (or build mjSIP locally first)
 - Default Nova prompt optimized for short, conversational responses (2-3 sentences)
+- **Critical**: When using `.mjsip-ua` config file, media descriptors must be initialized properly (see `NovaSonicVoipGateway.java:101-118`)

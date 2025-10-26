@@ -5,7 +5,7 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 
 export interface VoipGatewayEC2StackProps extends cdk.StackProps {
-  keyPairName: string;
+  keyPairName?: string;
   vpcId?: string;
 }
 
@@ -32,12 +32,24 @@ export class VoipGatewayEC2Stack extends cdk.Stack {
 
     const instanceRole = new iam.Role(this, 'TaskRole', {
       assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore')
+      ],
       inlinePolicies: {
         'BedrockAccess': new iam.PolicyDocument({
           statements: [
             new iam.PolicyStatement({
               actions: ['bedrock:InvokeModel', 'bedrock:GetModelInvocationLoggingConfiguration', 'bedrock:InvokeModelWithResponseStream'],
               resources: ['*'],
+              effect: iam.Effect.ALLOW
+            })
+          ]
+        }),
+        'S3Access': new iam.PolicyDocument({
+          statements: [
+            new iam.PolicyStatement({
+              actions: ['s3:GetObject', 's3:ListBucket'],
+              resources: ['arn:aws:s3:::voip-gateway-deployment-*', 'arn:aws:s3:::voip-gateway-deployment-*/*'],
               effect: iam.Effect.ALLOW
             })
           ]
@@ -83,7 +95,7 @@ export class VoipGatewayEC2Stack extends cdk.Stack {
         ec2.InstanceClass.T3,
         ec2.InstanceSize.MICRO
       ),
-      keyPair: ec2.KeyPair.fromKeyPairName(this, 'VoipGatewayKeypair', props.keyPairName),
+      keyPair: props.keyPairName ? ec2.KeyPair.fromKeyPairName(this, 'VoipGatewayKeypair', props.keyPairName) : undefined,
       machineImage: ec2.MachineImage.latestAmazonLinux2(),
       securityGroup: securityGroup,
       associatePublicIpAddress: true,
@@ -91,11 +103,13 @@ export class VoipGatewayEC2Stack extends cdk.Stack {
       role: instanceRole,
     });
 
-    // Add commands to the user data to install Java
+    // Add commands to the user data to install Java and SSM agent
     instance.userData.addCommands(
       '#!/bin/bash',
       'yum update -y',
-      'yum install -y java-24-amazon-corretto-devel maven git',
+      'yum install -y java-24-amazon-corretto-devel maven git amazon-ssm-agent',
+      'systemctl enable amazon-ssm-agent',
+      'systemctl start amazon-ssm-agent',
       'echo "Dependency installation completed"'
     );
 

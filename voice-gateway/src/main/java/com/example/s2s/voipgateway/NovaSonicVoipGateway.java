@@ -106,7 +106,13 @@ public class NovaSonicVoipGateway extends RegisteringMultipleUAS {
             public void onUaIncomingCall(UserAgent ua, NameAddress callee, NameAddress caller,
                                          MediaDesc[] media_descs) {
                 LOG.info("Incomming call from: {}", callee.getAddress());
-                ua.accept(new MediaAgent(mediaConfig.getMediaDescs(), streamerFactory));
+                MediaDesc[] mediaDescs = mediaConfig.getMediaDescs();
+                if (mediaDescs == null || mediaDescs.length == 0) {
+                    mediaDescs = createDefaultMediaDescs();
+                    LOG.info("Using default media descriptors");
+                }
+                LOG.info("About to accept call with SDP media descriptors: {}", java.util.Arrays.toString(mediaDescs));
+                ua.accept(new MediaAgent(mediaDescs, streamerFactory));
             }
         };
     }
