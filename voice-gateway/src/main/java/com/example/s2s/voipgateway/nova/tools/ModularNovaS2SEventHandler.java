@@ -5,6 +5,8 @@ import com.example.s2s.voipgateway.nova.event.PromptStartEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Map;
+
 /**
  * Modular S2S Event Handler with auto-discovery of tools.
  * Tools are automatically discovered from the tools package - just add a new Tool implementation
@@ -49,11 +51,13 @@ public class ModularNovaS2SEventHandler extends AbstractNovaS2SEventHandler {
         log.info("Auto-discovering and initializing ALL tools for phone number: {}", phoneNumber);
 
         ToolFactory factory = new ToolFactory(phoneNumber);
+        int count = 0;
         for (Tool tool : factory.createAllTools()) {
             toolRegistry.register(tool);
+            count++;
         }
 
-        log.info("Registered {} auto-discovered tools", toolRegistry.getAllTools().size());
+        log.info("Registered {} auto-discovered tools", count);
     }
 
     /**
@@ -66,11 +70,13 @@ public class ModularNovaS2SEventHandler extends AbstractNovaS2SEventHandler {
         log.info("Tools to enable: {}", promptConfig.getToolNames());
 
         ToolFactory factory = new ToolFactory(phoneNumber);
+        int count = 0;
         for (Tool tool : factory.createToolsByName(promptConfig.getToolNames())) {
             toolRegistry.register(tool);
+            count++;
         }
 
-        log.info("Registered {} configured tools", toolRegistry.getAllTools().size());
+        log.info("Registered {} configured tools", count);
     }
 
     /**
@@ -117,8 +123,7 @@ public class ModularNovaS2SEventHandler extends AbstractNovaS2SEventHandler {
 
     @Override
     public void close() {
-        if (pinpointClient != null) {
-            pinpointClient.close();
-        }
+        // ToolFactory manages PinpointClient lifecycle
+        // No cleanup needed here
     }
 }
