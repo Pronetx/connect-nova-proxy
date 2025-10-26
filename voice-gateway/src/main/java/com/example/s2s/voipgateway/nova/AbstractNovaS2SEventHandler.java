@@ -2,6 +2,7 @@ package com.example.s2s.voipgateway.nova;
 
 import com.example.s2s.voipgateway.nova.event.*;
 import com.example.s2s.voipgateway.nova.io.QueuedUlawInputStream;
+import com.example.s2s.voipgateway.nova.metrics.NovaUsageMetricsPublisher;
 import com.example.s2s.voipgateway.nova.observer.InteractObserver;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,8 +28,10 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
     private static final String ERROR_AUDIO_FILE = "error.wav";
     private final QueuedUlawInputStream audioStream = new QueuedUlawInputStream();
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final NovaUsageMetricsPublisher metricsPublisher = new NovaUsageMetricsPublisher();
     private InteractObserver<NovaSonicEvent> outbound;
     private String promptName;
+    private String sessionId;
     private boolean debugAudioOutput;
     private boolean playedErrorSound = false;
 
@@ -139,6 +142,18 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
         this.outbound = outbound;
     }
 
+    public void setSessionId(String sessionId) {
+        this.sessionId = sessionId;
+    }
+
+    /**
+     * Closes any resources held by this event handler.
+     * Subclasses should override this if they need to clean up resources.
+     */
+    public void close() {
+        // Default implementation does nothing
+    }
+
     /**
      * Handles the actual invocation of a tool.
      * @param toolUseId The tool use id.
@@ -152,6 +167,7 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
     public void handleToolUse(JsonNode node, String toolUseId, String toolName, String content) {
         log.info("Tool {} invoked with id={}, content={}", toolName, toolUseId, content);
         String contentName = UUID.randomUUID().toString();
+        boolean success = false;
         try {
             Map<String, Object> contentNode = new HashMap<>();
             handleToolInvocation(toolUseId, toolName, content, contentNode);
@@ -166,7 +182,14 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
             sendToolContentStart(toolUseId, contentName);
             outbound.onNext(toolResultEvent);
             outbound.onNext(ContentEndEvent.create(promptName, contentName));
+
+            success = true;
+
+            // Publish tool usage metrics
+            metricsPublisher.publishToolUsageMetrics(toolName, toolUseId, sessionId != null ? sessionId : "unknown", true);
         } catch (Exception e) {
+            // Publish failure metrics
+            metricsPublisher.publishToolUsageMetrics(toolName, toolUseId, sessionId != null ? sessionId : "unknown", false);
             throw new RuntimeException("Error creating JSON payload for toolResult", e);
         }
     }

@@ -2,6 +2,7 @@ package com.example.s2s.voipgateway.nova;
 
 import static software.amazon.awssdk.thirdparty.io.netty.util.internal.ObjectUtil.checkNotNull;
 
+import com.example.s2s.voipgateway.nova.metrics.NovaUsageMetricsPublisher;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -23,6 +24,7 @@ public class NovaS2SResponseHandler implements InvokeModelWithBidirectionalStrea
     public static final String TYPE_TOOL = "TOOL";
     private final NovaS2SEventHandler handler;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final NovaUsageMetricsPublisher metricsPublisher;
     private String toolUseId;
     private String toolUseContent;
     private String toolName;
@@ -30,6 +32,7 @@ public class NovaS2SResponseHandler implements InvokeModelWithBidirectionalStrea
 
     public NovaS2SResponseHandler(NovaS2SEventHandler handler) {
         this.handler = checkNotNull(handler, "handler cannot be null");
+        this.metricsPublisher = new NovaUsageMetricsPublisher();
         debugResponses = System.getenv().getOrDefault("DEBUG_RESPONSES","false").equalsIgnoreCase("true");
     }
 
@@ -117,6 +120,14 @@ public class NovaS2SResponseHandler implements InvokeModelWithBidirectionalStrea
                     handler.handleContentEnd(eventNode.get("contentEnd"));
                 } else if (eventNode.has("completionEnd")) {
                     handler.handleCompletionEnd(eventNode.get("completionEnd"));
+                } else if (eventNode.has("usageEvent")) {
+                    // Handle usage metrics
+                    JsonNode usageEvent = eventNode.get("usageEvent");
+                    metricsPublisher.publishUsageMetrics(usageEvent);
+                    log.debug("Usage event - Total tokens: {}, Input: {}, Output: {}",
+                            usageEvent.has("totalTokens") ? usageEvent.get("totalTokens").asInt() : 0,
+                            usageEvent.has("totalInputTokens") ? usageEvent.get("totalInputTokens").asInt() : 0,
+                            usageEvent.has("totalOutputTokens") ? usageEvent.get("totalOutputTokens").asInt() : 0);
                 } else {
                     log.info("Unhandled event: {}", eventNode);
                 }

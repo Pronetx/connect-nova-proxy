@@ -16,7 +16,7 @@
         <logStreamName>${INSTANCE_ID:-${HOSTNAME:-local}}</logStreamName>
 
         <!-- Region - will use default provider chain (instance profile, env vars, etc.) -->
-        <logRegion>us-east-1</logRegion>
+        <logRegion>us-west-2</logRegion>
 
         <!-- Layout for CloudWatch logs -->
         <layout>
