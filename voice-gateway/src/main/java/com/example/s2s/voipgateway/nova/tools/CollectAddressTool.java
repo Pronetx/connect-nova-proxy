@@ -121,7 +121,7 @@ public class CollectAddressTool implements Tool {
             output.put("city", city);
             output.put("state", state);
             output.put("zipcode", zipcode);
-            output.put("message", "Address confirmed and recorded successfully. If the caller wants an SMS, use the SendSMSTool with this address.");
+            output.put("message", "Address confirmed. IMPORTANT: Before calling addressValidationTool, you MUST tell the caller: 'Let me validate that address for you. This will just take a moment.' ONLY after speaking, then call addressValidationTool.");
             log.info("Address confirmed: {}", fullAddress);
 
         } catch (Exception e) {
