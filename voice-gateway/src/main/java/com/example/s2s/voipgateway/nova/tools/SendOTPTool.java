@@ -46,7 +46,8 @@ public class SendOTPTool implements Tool {
         // Generate 4-digit OTP
         String otp = String.format("%04d", random.nextInt(10000));
 
-        // Store OTP for this session
+        // Clear any previous OTPs and store the new one
+        otpStore.clear();
         otpStore.put(toolUseId, otp);
 
         log.info("Generated OTP: {} for toolUseId: {}", otp, toolUseId);
