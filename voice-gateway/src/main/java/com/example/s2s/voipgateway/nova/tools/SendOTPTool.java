@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Tool for generating and sending OTP codes via SMS.
@@ -52,19 +53,25 @@ public class SendOTPTool implements Tool {
 
         log.info("Generated OTP: {} for toolUseId: {}", otp, toolUseId);
 
-        // Send SMS via Pinpoint
-        boolean smsSent = sendSMS(phoneNumber, "Your authentication code is: " + otp);
+        // Send SMS asynchronously to avoid blocking audio stream
+        CompletableFuture.runAsync(() -> {
+            try {
+                boolean smsSent = sendSMS(phoneNumber, "Your authentication code is: " + otp);
+                if (smsSent) {
+                    log.info("Successfully sent OTP to {} (async)", phoneNumber);
+                } else {
+                    log.error("Failed to send SMS to {} (async)", phoneNumber);
+                }
+            } catch (Exception e) {
+                log.error("Error sending SMS asynchronously", e);
+            }
+        });
 
-        if (smsSent) {
-            output.put("status", "success");
-            output.put("message", "SMS sent successfully. Now tell the caller: 'The code should arrive in a few seconds. Please read me the four digits when you receive it.'");
-            output.put("sessionId", toolUseId);
-            log.info("Successfully sent OTP to {}", phoneNumber);
-        } else {
-            output.put("status", "error");
-            output.put("message", "Failed to send authentication code. Please try again.");
-            log.error("Failed to send SMS to {}", phoneNumber);
-        }
+        // Return immediately without blocking
+        output.put("status", "success");
+        output.put("message", "SMS sent successfully. Now tell the caller: 'The code should arrive in a few seconds. Please read me the four digits when you receive it.'");
+        output.put("sessionId", toolUseId);
+        log.info("Returning from sendOTPTool immediately (SMS sending in background)");
     }
 
     private boolean sendSMS(String phoneNumber, String message) {
