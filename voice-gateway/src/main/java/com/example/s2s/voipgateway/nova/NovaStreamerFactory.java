@@ -59,6 +59,7 @@ public class NovaStreamerFactory implements StreamerFactory {
                 .build();
 
         String promptName = UUID.randomUUID().toString();
+        log.info("Creating Nova session with ID: {}", promptName);
 
         NovaS2SBedrockInteractClient novaClient = new NovaS2SBedrockInteractClient(client, "amazon.nova-sonic-v1:0");
 
@@ -143,8 +144,31 @@ public class NovaStreamerFactory implements StreamerFactory {
                 .setSymmetricRtp(mediaConfig.isSymmetricRtp())
                 .build();
 
-        log.debug("Created AudioStreamer");
-        return new AudioStreamer(executor, flowSpec, tx, rx, options);
+        // Store references for cleanup callback
+        ModularNovaS2SEventHandler finalEventHandler = eventHandler;
+        CallRecorder finalCallRecorder = callRecorder;
+        String finalPromptName = promptName;
+
+        // Create AudioStreamer with halt() override for cleanup
+        AudioStreamer audioStreamer = new AudioStreamer(executor, flowSpec, tx, rx, options) {
+            @Override
+            public boolean halt() {
+                log.info("AudioStreamer halting - finalizing call session: {}", finalPromptName);
+                // Finalize recording before halting
+                if (finalCallRecorder != null && finalEventHandler != null) {
+                    try {
+                        log.info("Finalizing call recording for session: {}", finalPromptName);
+                        finalEventHandler.close();
+                    } catch (Exception e) {
+                        log.error("Error finalizing call recording", e);
+                    }
+                }
+                return super.halt();
+            }
+        };
+
+        log.debug("Created AudioStreamer with recording cleanup for session: {}", promptName);
+        return audioStreamer;
     }
 
     /**

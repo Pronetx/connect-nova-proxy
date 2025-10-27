@@ -123,6 +123,8 @@ public class ModularNovaS2SEventHandler extends AbstractNovaS2SEventHandler {
 
     @Override
     public void close() {
+        // Call parent's close to finalize call recording
+        super.close();
         // ToolFactory manages PinpointClient lifecycle
         // No cleanup needed here
     }
