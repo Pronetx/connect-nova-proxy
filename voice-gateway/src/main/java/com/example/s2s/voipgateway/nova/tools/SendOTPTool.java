@@ -57,7 +57,7 @@ public class SendOTPTool implements Tool {
 
         if (smsSent) {
             output.put("status", "success");
-            output.put("message", "Authentication code has been sent to your phone via SMS. Please wait to receive it and then repeat the 4-digit code.");
+            output.put("message", "SMS sent successfully. Now tell the caller: 'The code should arrive in a few seconds. Please read me the four digits when you receive it.'");
             output.put("sessionId", toolUseId);
             log.info("Successfully sent OTP to {}", phoneNumber);
         } else {
