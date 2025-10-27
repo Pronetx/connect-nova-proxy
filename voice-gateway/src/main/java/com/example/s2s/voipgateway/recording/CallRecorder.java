@@ -36,6 +36,11 @@ public class CallRecorder {
     private final ReentrantLock lock;
     private volatile boolean finalized;
 
+    // Track sample counts for timing synchronization
+    private int inboundSampleCount = 0;
+    private int outboundSampleCount = 0;
+    private long startTimeMillis;
+
     public CallRecorder(String sessionId, String callerPhoneNumber, S3Client s3Client, String bucketName) {
         this.sessionId = sessionId;
         this.callerPhoneNumber = callerPhoneNumber;
@@ -45,6 +50,7 @@ public class CallRecorder {
         this.outboundBuffer = new ByteArrayOutputStream();
         this.lock = new ReentrantLock();
         this.finalized = false;
+        this.startTimeMillis = System.currentTimeMillis();
 
         log.info("CallRecorder initialized for session: {} caller: {}", sessionId, callerPhoneNumber);
     }
@@ -61,6 +67,7 @@ public class CallRecorder {
         lock.lock();
         try {
             inboundBuffer.write(pcmData);
+            inboundSampleCount += pcmData.length / 2;
         } catch (IOException e) {
             log.error("Error recording inbound audio", e);
         } finally {
@@ -70,6 +77,7 @@ public class CallRecorder {
 
     /**
      * Record outbound audio (Nova to caller).
+     * Pads with silence to synchronize timing with inbound stream.
      * @param pcmData 16-bit PCM audio samples (mono)
      */
     public void recordOutbound(byte[] pcmData) {
@@ -79,7 +87,19 @@ public class CallRecorder {
 
         lock.lock();
         try {
+            // Pad outbound with silence to match inbound timing
+            // This ensures both streams stay synchronized
+            int silenceSamples = inboundSampleCount - outboundSampleCount;
+            if (silenceSamples > 0) {
+                // Add silence (zeros) to outbound to catch up with inbound
+                byte[] silence = new byte[silenceSamples * 2];
+                outboundBuffer.write(silence);
+                outboundSampleCount += silenceSamples;
+            }
+
+            // Now write the actual audio data
             outboundBuffer.write(pcmData);
+            outboundSampleCount += pcmData.length / 2;
         } catch (IOException e) {
             log.error("Error recording outbound audio", e);
         } finally {
@@ -93,7 +113,6 @@ public class CallRecorder {
      */
     public void finishAndUpload() {
         if (finalized) {
-            log.warn("CallRecorder already finalized for session: {}", sessionId);
             return;
         }
 
@@ -104,21 +123,21 @@ public class CallRecorder {
             byte[] inboundData = inboundBuffer.toByteArray();
             byte[] outboundData = outboundBuffer.toByteArray();
 
-            int inboundSamples = inboundData.length / 2; // 16-bit = 2 bytes per sample
+            int inboundSamples = inboundData.length / 2;
             int outboundSamples = outboundData.length / 2;
 
-            log.info("Finalizing recording: {} inbound samples, {} outbound samples",
-                     inboundSamples, outboundSamples);
+            log.info("Finalizing recording: {} inbound bytes ({} samples), {} outbound bytes ({} samples)",
+                     inboundData.length, inboundSamples, outboundData.length, outboundSamples);
 
             if (inboundSamples == 0 && outboundSamples == 0) {
-                log.warn("No audio recorded for session: {}", sessionId);
+                log.warn("No audio recorded for session: {} - skipping upload", sessionId);
                 return;
             }
 
-            // Mix to stereo WAV
-            byte[] stereoWav = mixToStereoWav(inboundData, outboundData);
+            // Mix to mono WAV (conversation style - sequential playback)
+            byte[] stereoWav = mixToMonoWav(inboundData, outboundData);
 
-            // Upload to S3
+            log.info("Created WAV file ({} bytes), uploading to S3 bucket: {}", stereoWav.length, bucketName);
             uploadToS3(stereoWav);
 
             log.info("Recording uploaded successfully for session: {}", sessionId);
@@ -131,67 +150,98 @@ public class CallRecorder {
     }
 
     /**
-     * Mix mono inbound and outbound streams into stereo WAV file.
-     * Left channel: inbound (caller)
-     * Right channel: outbound (Nova)
+     * Mix mono inbound and outbound streams into a stereo WAV file.
+     * Left channel = caller (inbound), Right channel = Nova (outbound).
+     * This preserves conversation timing including overlaps and barge-ins.
      */
-    private byte[] mixToStereoWav(byte[] inboundData, byte[] outboundData) throws IOException {
+    private byte[] mixToMonoWav(byte[] inboundData, byte[] outboundData) throws IOException {
         int inboundSamples = inboundData.length / 2;
         int outboundSamples = outboundData.length / 2;
+
+        // Use the LONGER stream as the base length
+        // This ensures we capture all audio from both participants
         int maxSamples = Math.max(inboundSamples, outboundSamples);
 
-        // Calculate WAV file size
-        int dataChunkSize = maxSamples * 2 * 2; // samples * channels * bytes_per_sample
-        int fileSize = 36 + dataChunkSize; // WAV header is 44 bytes, file size = header - 8 + data
+        log.info("Mixing audio: inbound={} samples ({}s), outbound={} samples ({}s), max={} samples ({}s)",
+                 inboundSamples, inboundSamples / (float)SAMPLE_RATE,
+                 outboundSamples, outboundSamples / (float)SAMPLE_RATE,
+                 maxSamples, maxSamples / (float)SAMPLE_RATE);
 
-        ByteArrayOutputStream wavStream = new ByteArrayOutputStream();
-        ByteBuffer buffer = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN);
+        // Read samples into arrays
+        short[] inbound = new short[maxSamples];
+        short[] outbound = new short[maxSamples];
 
-        // RIFF header
-        buffer.put("RIFF".getBytes());
-        buffer.putInt(fileSize);
-        buffer.put("WAVE".getBytes());
+        ByteBuffer inBuf = ByteBuffer.wrap(inboundData).order(ByteOrder.LITTLE_ENDIAN);
+        ByteBuffer outBuf = ByteBuffer.wrap(outboundData).order(ByteOrder.LITTLE_ENDIAN);
 
-        // fmt chunk
-        buffer.put("fmt ".getBytes());
-        buffer.putInt(16); // fmt chunk size
-        buffer.putShort((short) 1); // PCM format
-        buffer.putShort((short) CHANNELS); // Stereo
-        buffer.putInt(SAMPLE_RATE);
-        buffer.putInt(SAMPLE_RATE * CHANNELS * (BITS_PER_SAMPLE / 8)); // byte rate
-        buffer.putShort((short) (CHANNELS * (BITS_PER_SAMPLE / 8))); // block align
-        buffer.putShort((short) BITS_PER_SAMPLE);
-
-        // data chunk
-        buffer.put("data".getBytes());
-        buffer.putInt(dataChunkSize);
-
-        wavStream.write(buffer.array());
-
-        // Interleave stereo samples (L, R, L, R, ...)
-        ByteBuffer inboundBuf = ByteBuffer.wrap(inboundData).order(ByteOrder.LITTLE_ENDIAN);
-        ByteBuffer outboundBuf = ByteBuffer.wrap(outboundData).order(ByteOrder.LITTLE_ENDIAN);
-        ByteBuffer stereoBuf = ByteBuffer.allocate(maxSamples * 4).order(ByteOrder.LITTLE_ENDIAN);
-
-        for (int i = 0; i < maxSamples; i++) {
-            // Left channel (inbound/caller)
-            if (i < inboundSamples) {
-                stereoBuf.putShort(inboundBuf.getShort());
-            } else {
-                stereoBuf.putShort((short) 0); // Silence
-            }
-
-            // Right channel (outbound/Nova)
-            if (i < outboundSamples) {
-                stereoBuf.putShort(outboundBuf.getShort());
-            } else {
-                stereoBuf.putShort((short) 0); // Silence
-            }
+        // Copy actual samples (rest stays as 0/silence)
+        for (int i = 0; i < inboundSamples; i++) {
+            inbound[i] = inBuf.getShort();
+        }
+        for (int i = 0; i < outboundSamples; i++) {
+            outbound[i] = outBuf.getShort();
         }
 
-        wavStream.write(stereoBuf.array());
+        // Normalize audio levels - boost caller significantly, reduce Nova
+        normalizeAudio(inbound, 8.0);  // Boost caller audio 8x
+        normalizeAudio(outbound, 0.5); // Reduce Nova audio by half
+
+        // Build stereo WAV file (left=caller, right=Nova)
+        int dataChunkSize = maxSamples * 2 * 2; // stereo: samples * 2_channels * bytes_per_sample
+        int fileSize = 36 + dataChunkSize;
+
+        ByteArrayOutputStream wavStream = new ByteArrayOutputStream();
+        ByteBuffer header = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN);
+
+        // RIFF header
+        header.put("RIFF".getBytes());
+        header.putInt(fileSize);
+        header.put("WAVE".getBytes());
+
+        // fmt chunk
+        header.put("fmt ".getBytes());
+        header.putInt(16);
+        header.putShort((short) 1); // PCM
+        header.putShort((short) 2); // Stereo (2 channels)
+        header.putInt(SAMPLE_RATE);
+        header.putInt(SAMPLE_RATE * 2 * (BITS_PER_SAMPLE / 8)); // byte rate for stereo
+        header.putShort((short) (2 * (BITS_PER_SAMPLE / 8))); // block align for stereo
+        header.putShort((short) BITS_PER_SAMPLE);
+
+        // data chunk
+        header.put("data".getBytes());
+        header.putInt(dataChunkSize);
+
+        wavStream.write(header.array());
+
+        // Write stereo samples: interleave left (inbound) and right (outbound)
+        ByteBuffer stereoData = ByteBuffer.allocate(maxSamples * 4).order(ByteOrder.LITTLE_ENDIAN);
+        for (int i = 0; i < maxSamples; i++) {
+            stereoData.putShort(inbound[i]);  // Left channel (caller)
+            stereoData.putShort(outbound[i]); // Right channel (Nova)
+        }
+
+        wavStream.write(stereoData.array());
 
         return wavStream.toByteArray();
+    }
+
+    /**
+     * Normalize audio levels by applying gain and preventing clipping.
+     * @param samples Audio samples to normalize
+     * @param gain Gain multiplier (1.0 = no change, >1.0 = louder, <1.0 = quieter)
+     */
+    private void normalizeAudio(short[] samples, double gain) {
+        for (int i = 0; i < samples.length; i++) {
+            double normalized = samples[i] * gain;
+            // Prevent clipping
+            if (normalized > Short.MAX_VALUE) {
+                normalized = Short.MAX_VALUE;
+            } else if (normalized < Short.MIN_VALUE) {
+                normalized = Short.MIN_VALUE;
+            }
+            samples[i] = (short) normalized;
+        }
     }
 
     /**
@@ -207,7 +257,12 @@ public class CallRecorder {
             LocalDateTime now = LocalDateTime.now();
             String datePrefix = now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
             String timestamp = now.format(DateTimeFormatter.ofPattern("HHmmss"));
-            String fileName = String.format("%s/%s-%s.wav", datePrefix, sessionId, timestamp);
+
+            // Sanitize phone number for filename (remove + and other special chars)
+            String sanitizedPhone = callerPhoneNumber.replaceAll("[^0-9]", "");
+
+            // Format: YYYY-MM-DD/phone-sessionId-HHmmss.wav
+            String fileName = String.format("%s/%s-%s-%s.wav", datePrefix, sanitizedPhone, sessionId, timestamp);
 
             PutObjectRequest request = PutObjectRequest.builder()
                     .bucket(bucketName)

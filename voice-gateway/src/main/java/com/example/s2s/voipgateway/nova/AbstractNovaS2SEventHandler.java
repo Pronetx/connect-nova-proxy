@@ -36,6 +36,7 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
     private boolean debugAudioOutput;
     private boolean playedErrorSound = false;
     private CallRecorder callRecorder; // Optional call recorder
+    private volatile boolean bargeInDetected = false; // Tracks if user interrupted Nova
 
     public AbstractNovaS2SEventHandler() {
         this(null);
@@ -51,22 +52,55 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
         log.info("Completion started for node: {}", node);
         promptName = node.get("promptName").asText();
         log.info("Completion started with promptId: {}", promptName);
+        // Reset barge-in flag for new completion
+        bargeInDetected = false;
     }
 
     @Override
     public void handleContentStart(JsonNode node) {
-
+        // Reset barge-in flag when assistant starts new content (audio response)
+        if (node.has("role") && "ASSISTANT".equals(node.get("role").asText())) {
+            if (bargeInDetected) {
+                log.info("✅ Resuming audio output - Assistant starting new response");
+                bargeInDetected = false;
+            }
+        }
     }
 
     @Override
     public void handleTextOutput(JsonNode node) {
+        // Extract text content to check for barge-in
+        String content = node.has("content") ? node.get("content").asText() : "";
+        String role = node.has("role") ? node.get("role").asText() : "UNKNOWN";
 
+        // Check for barge-in marker
+        if (content.contains("{ \"interrupted\" : true }")) {
+            log.info("🔴 BARGE-IN DETECTED - User interrupted Nova during speech");
+            bargeInDetected = true;
+            // Clear the audio queue to stop playing interrupted audio
+            audioStream.clearQueue();
+        }
+
+        // Log text output for debugging (strip barge-in marker for clean logs)
+        String cleanContent = content.replace("{ \"interrupted\" : true }", "").trim();
+        if (!cleanContent.isEmpty()) {
+            log.info("Text output [{}]: {}", role, cleanContent);
+        }
     }
 
     @Override
     public void handleAudioOutput(JsonNode node) {
         String content = node.get("content").asText();
         String role = node.get("role").asText();
+
+        // Skip audio output if barge-in was detected
+        if (bargeInDetected) {
+            if (debugAudioOutput) {
+                log.debug("Skipping audio output due to barge-in");
+            }
+            return;
+        }
+
         if (debugAudioOutput) {
             log.info("Received audio output {} from {}", content, role);
         }
@@ -182,11 +216,18 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
      * Subclasses should override this if they need to clean up resources.
      */
     public void close() {
+        log.info("AbstractNovaS2SEventHandler.close() called, callRecorder={}", callRecorder);
         // Finalize and upload recording if enabled
         if (callRecorder != null) {
             log.info("Finalizing call recording...");
-            callRecorder.finishAndUpload();
-            log.info("Call recording finalized: {}", callRecorder.getStats());
+            try {
+                callRecorder.finishAndUpload();
+                log.info("Call recording finalized: {}", callRecorder.getStats());
+            } catch (Exception e) {
+                log.error("Error during call recording finalization", e);
+            }
+        } else {
+            log.warn("CallRecorder is null - recording will not be saved");
         }
     }
 
