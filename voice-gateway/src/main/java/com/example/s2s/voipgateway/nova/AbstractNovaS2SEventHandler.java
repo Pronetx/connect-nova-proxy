@@ -37,6 +37,7 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
     private boolean playedErrorSound = false;
     private CallRecorder callRecorder; // Optional call recorder
     private volatile boolean bargeInDetected = false; // Tracks if user interrupted Nova
+    private volatile long bargeInTimestamp = 0; // When barge-in was detected
 
     public AbstractNovaS2SEventHandler() {
         this(null);
@@ -54,15 +55,24 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
         log.info("Completion started with promptId: {}", promptName);
         // Reset barge-in flag for new completion
         bargeInDetected = false;
+        bargeInTimestamp = 0;
     }
 
     @Override
     public void handleContentStart(JsonNode node) {
-        // Reset barge-in flag when assistant starts new content (audio response)
-        if (node.has("role") && "ASSISTANT".equals(node.get("role").asText())) {
-            if (bargeInDetected) {
+        String role = node.has("role") ? node.get("role").asText() : "UNKNOWN";
+
+        // Reset barge-in flag when assistant OR user starts new content
+        // This ensures audio resumes after any interruption
+        if (bargeInDetected) {
+            if ("ASSISTANT".equals(role)) {
                 log.info("✅ Resuming audio output - Assistant starting new response");
                 bargeInDetected = false;
+                bargeInTimestamp = 0;
+            } else if ("USER".equals(role)) {
+                log.info("✅ Resuming audio output - User starting new input");
+                bargeInDetected = false;
+                bargeInTimestamp = 0;
             }
         }
     }
@@ -77,6 +87,7 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
         if (content.contains("{ \"interrupted\" : true }")) {
             log.info("🔴 BARGE-IN DETECTED - User interrupted Nova during speech");
             bargeInDetected = true;
+            bargeInTimestamp = System.currentTimeMillis();
             // Clear the audio queue to stop playing interrupted audio
             audioStream.clearQueue();
         }
@@ -92,6 +103,16 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
     public void handleAudioOutput(JsonNode node) {
         String content = node.get("content").asText();
         String role = node.get("role").asText();
+
+        // Check if barge-in has been stuck for too long (>5 seconds) and auto-reset
+        if (bargeInDetected && bargeInTimestamp > 0) {
+            long elapsed = System.currentTimeMillis() - bargeInTimestamp;
+            if (elapsed > 5000) {
+                log.warn("⚠️  Barge-in flag stuck for {}ms - auto-resetting to prevent permanent audio block", elapsed);
+                bargeInDetected = false;
+                bargeInTimestamp = 0;
+            }
+        }
 
         // Skip audio output if barge-in was detected
         if (bargeInDetected) {
