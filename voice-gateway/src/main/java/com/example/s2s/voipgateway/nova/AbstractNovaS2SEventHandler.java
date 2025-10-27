@@ -4,6 +4,7 @@ import com.example.s2s.voipgateway.nova.event.*;
 import com.example.s2s.voipgateway.nova.io.QueuedUlawInputStream;
 import com.example.s2s.voipgateway.nova.metrics.NovaUsageMetricsPublisher;
 import com.example.s2s.voipgateway.nova.observer.InteractObserver;
+import com.example.s2s.voipgateway.recording.CallRecorder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -34,6 +35,7 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
     private String sessionId;
     private boolean debugAudioOutput;
     private boolean playedErrorSound = false;
+    private CallRecorder callRecorder; // Optional call recorder
 
     public AbstractNovaS2SEventHandler() {
         this(null);
@@ -157,11 +159,35 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
     }
 
     /**
+     * Set the call recorder for recording audio streams.
+     * @param recorder The call recorder instance
+     */
+    public void setCallRecorder(CallRecorder recorder) {
+        this.callRecorder = recorder;
+        // Inject recorder into audio stream for outbound recording
+        audioStream.setCallRecorder(recorder);
+        log.info("CallRecorder injected into audio streams");
+    }
+
+    /**
+     * Get the call recorder.
+     * @return The call recorder, or null if not set
+     */
+    public CallRecorder getCallRecorder() {
+        return callRecorder;
+    }
+
+    /**
      * Closes any resources held by this event handler.
      * Subclasses should override this if they need to clean up resources.
      */
     public void close() {
-        // Default implementation does nothing
+        // Finalize and upload recording if enabled
+        if (callRecorder != null) {
+            log.info("Finalizing call recording...");
+            callRecorder.finishAndUpload();
+            log.info("Call recording finalized: {}", callRecorder.getStats());
+        }
     }
 
     /**

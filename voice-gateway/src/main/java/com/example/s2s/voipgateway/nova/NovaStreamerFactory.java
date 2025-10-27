@@ -10,6 +10,7 @@ import com.example.s2s.voipgateway.NovaMediaConfig;
 import com.example.s2s.voipgateway.NovaSonicAudioInput;
 import com.example.s2s.voipgateway.NovaSonicAudioOutput;
 import com.example.s2s.voipgateway.nova.observer.InteractObserver;
+import com.example.s2s.voipgateway.recording.CallRecorder;
 import org.mjsip.media.AudioStreamer;
 import org.mjsip.media.FlowSpec;
 import org.mjsip.media.MediaStreamer;
@@ -24,6 +25,7 @@ import software.amazon.awssdk.http.ProtocolNegotiation;
 import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.bedrockruntime.BedrockRuntimeAsyncClient;
+import software.amazon.awssdk.services.s3.S3Client;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
@@ -99,6 +101,22 @@ public class NovaStreamerFactory implements StreamerFactory {
 
         log.info("Using system prompt: {}", systemPrompt);
 
+        // Initialize call recorder if enabled
+        CallRecorder callRecorder = null;
+        String recordingBucket = System.getenv().getOrDefault("CALL_RECORDING_BUCKET", "");
+        boolean recordingEnabled = !recordingBucket.isEmpty();
+
+        if (recordingEnabled) {
+            log.info("Call recording enabled - bucket: {}", recordingBucket);
+            S3Client s3Client = S3Client.builder()
+                    .region(Region.US_WEST_2)
+                    .build();
+            callRecorder = new CallRecorder(promptName, callerPhone, s3Client, recordingBucket);
+            log.info("CallRecorder initialized for session: {}", promptName);
+        } else {
+            log.info("Call recording disabled - set CALL_RECORDING_BUCKET environment variable to enable");
+        }
+
         InteractObserver<NovaSonicEvent> inputObserver = novaClient.interactMultimodal(
                 createSessionStartEvent(),
                 createPromptStartEvent(promptName, eventHandler),
@@ -106,8 +124,19 @@ public class NovaStreamerFactory implements StreamerFactory {
                 eventHandler);
 
         eventHandler.setOutbound(inputObserver);
+
+        // Inject call recorder into event handler for upload on call completion
+        if (callRecorder != null) {
+            eventHandler.setCallRecorder(callRecorder);
+        }
+
         AudioTransmitter tx = new NovaSonicAudioInput(eventHandler);
-        AudioReceiver rx = new NovaSonicAudioOutput(inputObserver, promptName);
+        NovaSonicAudioOutput rx = new NovaSonicAudioOutput(inputObserver, promptName);
+
+        // Inject call recorder into audio receiver for inbound recording
+        if (callRecorder != null) {
+            rx.setCallRecorder(callRecorder);
+        }
 
         StreamerOptions options = StreamerOptions.builder()
                 .setRandomEarlyDrop(mediaConfig.getRandomEarlyDropRate())

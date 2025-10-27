@@ -103,14 +103,8 @@ public class ToolProvider {
                     } else if (paramTypes[i] == Map.class) {
                         params[i] = otpStore;
                     } else if (paramTypes[i] == String.class) {
-                        // Only use phoneNumber for String params if other dependencies are also present
-                        // This avoids incorrectly injecting phoneNumber into tools that don't need it
-                        if (paramTypes.length > 1) {
-                            params[i] = phoneNumber;
-                        } else {
-                            canConstruct = false;
-                            break;
-                        }
+                        // Inject phone number for String parameters
+                        params[i] = phoneNumber;
                     } else {
                         canConstruct = false;
                         break;

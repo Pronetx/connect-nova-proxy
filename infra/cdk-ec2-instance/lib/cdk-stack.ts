@@ -2,6 +2,7 @@
 import * as cdk from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as s3 from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
 
 export interface VoipGatewayEC2StackProps extends cdk.StackProps {
@@ -12,6 +13,27 @@ export interface VoipGatewayEC2StackProps extends cdk.StackProps {
 export class VoipGatewayEC2Stack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: VoipGatewayEC2StackProps) {
     super(scope, id, props);
+
+    // Create S3 bucket for call recordings
+    const callRecordingsBucket = new s3.Bucket(this, 'CallRecordingsBucket', {
+      bucketName: `voice-gateway-recordings-${this.account}-${this.region}`,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      lifecycleRules: [
+        {
+          // Move to Glacier after 30 days for cost savings
+          transitions: [
+            {
+              storageClass: s3.StorageClass.GLACIER,
+              transitionAfter: cdk.Duration.days(30),
+            },
+          ],
+          // Delete after 1 year (adjust as needed)
+          expiration: cdk.Duration.days(365),
+        },
+      ],
+      removalPolicy: cdk.RemovalPolicy.RETAIN, // Keep recordings even if stack is deleted
+    });
 
     // Create a VPC with public subnets
     const vpc = props.vpcId ?
@@ -50,6 +72,11 @@ export class VoipGatewayEC2Stack extends cdk.Stack {
             new iam.PolicyStatement({
               actions: ['s3:GetObject', 's3:ListBucket'],
               resources: ['arn:aws:s3:::voip-gateway-deployment-*', 'arn:aws:s3:::voip-gateway-deployment-*/*'],
+              effect: iam.Effect.ALLOW
+            }),
+            new iam.PolicyStatement({
+              actions: ['s3:PutObject', 's3:PutObjectAcl'],
+              resources: [callRecordingsBucket.arnForObjects('*')],
               effect: iam.Effect.ALLOW
             })
           ]
@@ -157,6 +184,9 @@ export class VoipGatewayEC2Stack extends cdk.Stack {
       'INSTANCE_ID=$(ec2-metadata --instance-id | cut -d " " -f 2)',
       'echo "export INSTANCE_ID=$INSTANCE_ID" >> /etc/environment',
       '',
+      '# Set call recordings S3 bucket environment variable',
+      `echo "export CALL_RECORDING_BUCKET=${callRecordingsBucket.bucketName}" >> /etc/environment`,
+      '',
       '# Create CloudWatch agent configuration',
       'cat > /opt/aws/amazon-cloudwatch-agent/etc/config.json << EOF',
       '{',
@@ -167,8 +197,9 @@ export class VoipGatewayEC2Stack extends cdk.Stack {
       '          {',
       '            "file_path": "/home/ec2-user/gateway.log",',
       '            "log_group_name": "/aws/voip-gateway/system",',
-      '            "log_stream_name": "{instance_id}/gateway.log",',
-      '            "retention_in_days": 7',
+      '            "log_stream_name": "{instance_id}/{local_hostname}",',
+      '            "retention_in_days": 7,',
+      '            "timezone": "UTC"',
       '          }',
       '        ]',
       '      }',
@@ -191,6 +222,13 @@ export class VoipGatewayEC2Stack extends cdk.Stack {
     new cdk.CfnOutput(this, 'InstancePublicIP', {
       value: instance.instancePublicIp,
       description: 'Public IP address of the EC2 instance',
+    });
+
+    // Output the call recordings bucket name
+    new cdk.CfnOutput(this, 'CallRecordingsBucketName', {
+      value: callRecordingsBucket.bucketName,
+      description: 'S3 bucket for storing call recordings',
+      exportName: 'VoiceGatewayRecordingsBucket',
     });
   }
 }

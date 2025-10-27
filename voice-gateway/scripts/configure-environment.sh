@@ -79,9 +79,13 @@ AUTH_USER=${AUTH_USER}
 AUTH_PASSWORD=${AUTH_PASSWORD}
 AUTH_REALM=${AUTH_REALM}
 DISPLAY_NAME=${DISPLAY_NAME}
-PINPOINT_APPLICATION_ID=f87ebc6cb0924d51a0e0de7dfa5ddc3f"
+PINPOINT_APPLICATION_ID=f87ebc6cb0924d51a0e0de7dfa5ddc3f
+CALL_RECORDING_BUCKET=voice-gateway-recordings-322081704783-us-west-2
+ADDRESS_VALIDATION_LAMBDA_URL=https://yo3qim52ngs3euzwkdxidl3isa0zomgt.lambda-url.us-west-2.on.aws/"
     else
-        ENV_CONTENT="PINPOINT_APPLICATION_ID=f87ebc6cb0924d51a0e0de7dfa5ddc3f"
+        ENV_CONTENT="PINPOINT_APPLICATION_ID=f87ebc6cb0924d51a0e0de7dfa5ddc3f
+CALL_RECORDING_BUCKET=voice-gateway-recordings-322081704783-us-west-2
+ADDRESS_VALIDATION_LAMBDA_URL=https://yo3qim52ngs3euzwkdxidl3isa0zomgt.lambda-url.us-west-2.on.aws/"
     fi
 
     CMD_ID=$(aws ssm send-command \

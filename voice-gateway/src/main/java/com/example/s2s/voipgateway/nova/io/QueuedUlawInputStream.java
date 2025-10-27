@@ -1,6 +1,7 @@
 package com.example.s2s.voipgateway.nova.io;
 
 import com.example.s2s.voipgateway.nova.transcode.PcmToULawTranscoder;
+import com.example.s2s.voipgateway.recording.CallRecorder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,6 +14,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * An InputStream backed by a queue for sending outbound ULAW audio.
+ * Also records outbound audio (Nova to caller) for call recording.
  */
 public class QueuedUlawInputStream extends InputStream {
     private static final Logger log = LoggerFactory.getLogger(QueuedUlawInputStream.class);
@@ -23,6 +25,15 @@ public class QueuedUlawInputStream extends InputStream {
     private boolean open = true;
     private OutputStream testOutput;
     private boolean debugAudioSent = System.getenv().getOrDefault("DEBUG_AUDIO_SENT", "false").equalsIgnoreCase("true");
+    private CallRecorder callRecorder; // Optional call recorder
+
+    /**
+     * Set the call recorder for recording outbound audio.
+     * @param recorder The call recorder instance
+     */
+    public void setCallRecorder(CallRecorder recorder) {
+        this.callRecorder = recorder;
+    }
 
     /**
      * Appends PCM audio data to the queue.  The data is expected to be 8000 khz sample rate, 16 bit samples, 1 channel.
@@ -31,6 +42,11 @@ public class QueuedUlawInputStream extends InputStream {
      * @throws InterruptedException If an interrupt is thrown while appending audio data to the queue.
      */
     public void append(byte[] data) throws InterruptedException {
+        // Record outbound audio (Nova to caller) before transcoding
+        if (callRecorder != null) {
+            callRecorder.recordOutbound(data);
+        }
+
         data = PcmToULawTranscoder.transcodeBytes(data);
         queue.put(data);
 

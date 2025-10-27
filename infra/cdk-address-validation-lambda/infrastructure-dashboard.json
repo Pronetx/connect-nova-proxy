@@ -1,0 +1,635 @@
+{
+  "widgets": [
+    {
+      "type": "text",
+      "x": 0,
+      "y": 0,
+      "width": 24,
+      "height": 1,
+      "properties": {
+        "markdown": "# Infrastructure & Microservices Dashboard\nComprehensive monitoring for Voice Gateway infrastructure, Chime integration, and microservices"
+      }
+    },
+    {
+      "type": "text",
+      "x": 0,
+      "y": 1,
+      "width": 24,
+      "height": 1,
+      "properties": {
+        "markdown": "## EC2 Voice Gateway Instance"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 2,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/EC2", "CPUUtilization", { "stat": "Average" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-west-2",
+        "title": "EC2 CPU Utilization",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0,
+            "max": 100
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 8,
+      "y": 2,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/EC2", "NetworkIn", { "stat": "Sum", "label": "Network In" } ],
+          [ ".", "NetworkOut", { "stat": "Sum", "label": "Network Out" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-west-2",
+        "title": "EC2 Network Traffic (RTP/SIP)",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 16,
+      "y": 2,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/EC2", "StatusCheckFailed", { "stat": "Sum" } ],
+          [ ".", "StatusCheckFailed_Instance", { "stat": "Sum" } ],
+          [ ".", "StatusCheckFailed_System", { "stat": "Sum" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-west-2",
+        "title": "EC2 Health Checks",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "x": 0,
+      "y": 8,
+      "width": 24,
+      "height": 1,
+      "properties": {
+        "markdown": "## ECS Cluster (if deployed)"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 9,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/ECS", "CPUUtilization", { "stat": "Average" } ],
+          [ ".", "MemoryUtilization", { "stat": "Average" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-west-2",
+        "title": "ECS Container Resources",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0,
+            "max": 100
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 8,
+      "y": 9,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "ECS/ContainerInsights", "RunningTaskCount", { "stat": "Average" } ],
+          [ ".", "DesiredTaskCount", { "stat": "Average" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-west-2",
+        "title": "ECS Task Count",
+        "period": 300
+      }
+    },
+    {
+      "type": "metric",
+      "x": 16,
+      "y": 9,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/ECS", "ServiceConnectBytesReceived", { "stat": "Sum" } ],
+          [ ".", "ServiceConnectBytesSent", { "stat": "Sum" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-west-2",
+        "title": "ECS Network Traffic",
+        "period": 300
+      }
+    },
+    {
+      "type": "text",
+      "x": 0,
+      "y": 15,
+      "width": 24,
+      "height": 1,
+      "properties": {
+        "markdown": "## Lambda Microservices"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 16,
+      "width": 6,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/Lambda", "Invocations", { "stat": "Sum", "label": "Total Invocations" } ],
+          [ ".", "Errors", { "stat": "Sum", "label": "Errors", "color": "#d62728" } ],
+          [ ".", "Throttles", { "stat": "Sum", "label": "Throttles", "color": "#ff7f0e" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-west-2",
+        "title": "Lambda Invocations & Errors",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 6,
+      "y": 16,
+      "width": 6,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/Lambda", "Duration", { "stat": "Average" } ],
+          [ "...", { "stat": "p99" } ],
+          [ "...", { "stat": "Maximum" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-west-2",
+        "title": "Lambda Duration (ms)",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 16,
+      "width": 6,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/Lambda", "ConcurrentExecutions", { "stat": "Maximum" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-west-2",
+        "title": "Lambda Concurrent Executions",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 18,
+      "y": 16,
+      "width": 6,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ { "expression": "100*(m2/m1)", "label": "Error Rate %", "id": "e1" } ],
+          [ "AWS/Lambda", "Invocations", { "stat": "Sum", "id": "m1", "visible": false } ],
+          [ ".", "Errors", { "stat": "Sum", "id": "m2", "visible": false } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-west-2",
+        "title": "Lambda Error Rate",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0,
+            "max": 100
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "x": 0,
+      "y": 22,
+      "width": 24,
+      "height": 1,
+      "properties": {
+        "markdown": "## Bedrock Nova API Usage"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 23,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/Bedrock", "Invocations", { "stat": "Sum" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-1",
+        "title": "Bedrock Invocations",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 8,
+      "y": 23,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/Bedrock", "InvocationLatency", { "stat": "Average" } ],
+          [ "...", { "stat": "p99" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-1",
+        "title": "Bedrock Latency",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 16,
+      "y": 23,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/Bedrock", "InvocationClientErrors", { "stat": "Sum", "color": "#ff7f0e" } ],
+          [ ".", "InvocationServerErrors", { "stat": "Sum", "color": "#d62728" } ],
+          [ ".", "InvocationThrottles", { "stat": "Sum", "color": "#9467bd" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-1",
+        "title": "Bedrock Errors & Throttles",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "x": 0,
+      "y": 29,
+      "width": 24,
+      "height": 1,
+      "properties": {
+        "markdown": "## Application KPIs (Custom Metrics)"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 30,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "NovaGateway/Usage", "InputTokens", { "stat": "Sum" } ],
+          [ ".", "OutputTokens", { "stat": "Sum" } ],
+          [ ".", "TotalTokens", { "stat": "Sum" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-west-2",
+        "title": "Nova Token Usage",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 8,
+      "y": 30,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "NovaGateway/Usage", "InputTextTokens", { "stat": "Sum", "label": "Text Input" } ],
+          [ ".", "InputSpeechTokens", { "stat": "Sum", "label": "Speech Input" } ],
+          [ ".", "OutputTextTokens", { "stat": "Sum", "label": "Text Output" } ],
+          [ ".", "OutputSpeechTokens", { "stat": "Sum", "label": "Speech Output" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-west-2",
+        "title": "Token Breakdown (Text vs Speech)",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 16,
+      "y": 30,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "NovaGateway/Usage", "ToolInvocations", { "stat": "Sum" } ],
+          [ ".", "ToolSuccess", { "stat": "Sum" } ],
+          [ ".", "ToolFailure", { "stat": "Sum" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-west-2",
+        "title": "Tool Invocations",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 36,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ { "expression": "SEARCH('{NovaGateway/Usage,ToolName} MetricName=\"ToolInvocations\"', 'Sum', 300)", "id": "e1" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-west-2",
+        "title": "Tool Invocations by Tool Name",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 36,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ { "expression": "SEARCH('{NovaGateway/Usage,SessionId} MetricName=\"TotalTokens\"', 'Sum', 300)", "id": "e1", "visible": false } ],
+          [ { "expression": "e1 / 300", "label": "Unique Sessions (approx)", "id": "e2" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-west-2",
+        "title": "Active Sessions (approximation)",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "x": 0,
+      "y": 42,
+      "width": 24,
+      "height": 1,
+      "properties": {
+        "markdown": "## VPC & Networking"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 43,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/VPC", "BytesIn", { "stat": "Sum" } ],
+          [ ".", "BytesOut", { "stat": "Sum" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-west-2",
+        "title": "VPC Traffic",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 43,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/VPC", "PacketsDroppedTotal", { "stat": "Sum" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-west-2",
+        "title": "VPC Packets Dropped",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "x": 0,
+      "y": 49,
+      "width": 24,
+      "height": 1,
+      "properties": {
+        "markdown": "## CloudWatch Logs Insights"
+      }
+    },
+    {
+      "type": "log",
+      "x": 0,
+      "y": 50,
+      "width": 24,
+      "height": 6,
+      "properties": {
+        "query": "SOURCE '/aws/voip-gateway/system'\n| fields @timestamp, @message\n| filter @message like /ERROR|EXCEPTION|FATAL/\n| sort @timestamp desc\n| limit 20",
+        "region": "us-west-2",
+        "title": "Recent Gateway Errors",
+        "stacked": false
+      }
+    },
+    {
+      "type": "log",
+      "x": 0,
+      "y": 56,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "query": "SOURCE '/aws/lambda/AddressValidationLambdaStack-AddressValidationFunction'\n| fields @timestamp, @message\n| filter @message like /ERROR|Error|error/\n| sort @timestamp desc\n| limit 20",
+        "region": "us-west-2",
+        "title": "Recent Lambda Errors",
+        "stacked": false
+      }
+    },
+    {
+      "type": "log",
+      "x": 12,
+      "y": 56,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "query": "SOURCE '/aws/voip-gateway/system'\n| fields @timestamp, @message\n| filter @message like /INVITE|BYE|200 OK/\n| stats count() by bin(5m)\n| sort bin(5m) desc",
+        "region": "us-west-2",
+        "title": "SIP Messages (5min buckets)",
+        "stacked": false
+      }
+    },
+    {
+      "type": "text",
+      "x": 0,
+      "y": 62,
+      "width": 24,
+      "height": 1,
+      "properties": {
+        "markdown": "## Chime Voice Connector (requires Chime metrics enabled)"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 63,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/ChimeVoiceConnector", "InboundCallAttempts", { "stat": "Sum" } ],
+          [ ".", "InboundCallFailures", { "stat": "Sum" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-west-2",
+        "title": "Chime Inbound Calls",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 63,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/ChimeVoiceConnector", "RTTMilliseconds", { "stat": "Average" } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-west-2",
+        "title": "Chime Voice RTT",
+        "period": 300,
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    }
+  ]
+}

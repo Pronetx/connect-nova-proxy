@@ -9,6 +9,7 @@ import com.example.s2s.voipgateway.nova.event.NovaSonicEvent;
 import com.example.s2s.voipgateway.nova.event.StartAudioContent;
 import com.example.s2s.voipgateway.nova.observer.InteractObserver;
 import com.example.s2s.voipgateway.nova.transcode.UlawToPcmTranscoder;
+import com.example.s2s.voipgateway.recording.CallRecorder;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -19,6 +20,7 @@ import java.util.UUID;
 
 /**
  * Abstracts Nova S2S outbound audio as an OutputStream.
+ * Also records inbound audio (caller to Nova) for call recording.
  */
 public class NovaAudioOutputStream extends OutputStream {
     private final InteractObserver<NovaSonicEvent> observer;
@@ -28,11 +30,20 @@ public class NovaAudioOutputStream extends OutputStream {
     private boolean startSent = false;
     private OutputStream audioFileOutput;
     private boolean debugAudioReceived = System.getenv().getOrDefault("DEBUG_AUDIO_RECEIVED", "false").equalsIgnoreCase("true");
+    private CallRecorder callRecorder; // Optional call recorder
 
     public NovaAudioOutputStream(InteractObserver<NovaSonicEvent> observer, String promptName) {
         this.observer = observer;
         this.promptName = promptName;
         this.contentName = UUID.randomUUID().toString();
+    }
+
+    /**
+     * Set the call recorder for recording inbound audio.
+     * @param recorder The call recorder instance
+     */
+    public void setCallRecorder(CallRecorder recorder) {
+        this.callRecorder = recorder;
     }
 
     @Override
@@ -53,6 +64,11 @@ public class NovaAudioOutputStream extends OutputStream {
         byte[] pcmData = UlawToPcmTranscoder.convertByteArray(b);
         if (audioFileOutput != null) {
             audioFileOutput.write(pcmData);
+        }
+
+        // Record inbound audio (caller to Nova)
+        if (callRecorder != null) {
+            callRecorder.recordInbound(pcmData);
         }
 
         observer.onNext(new AudioInputEvent(AudioInputEvent.AudioInput.builder()
@@ -99,6 +115,7 @@ public class NovaAudioOutputStream extends OutputStream {
             audioFileOutput.close();
             audioFileOutput=null;
         }
-        observer.onComplete();
+        // Don't call observer.onComplete() here - the stream closing doesn't mean the call ended
+        // onComplete() should only be called when the SIP call actually terminates
     }
 }
