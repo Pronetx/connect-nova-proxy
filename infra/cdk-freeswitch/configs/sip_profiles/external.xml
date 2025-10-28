@@ -1,0 +1,65 @@
+<profile name="external">
+  <!-- External SIP Profile for Voice Connector -->
+
+  <settings>
+    <!-- Basic SIP settings -->
+    <param name="debug" value="1"/>
+    <param name="sip-trace" value="yes"/>
+    <param name="sip-capture" value="no"/>
+
+    <!-- Port settings -->
+    <param name="sip-port" value="$${external_sip_port}"/>
+    <param name="rtp-ip" value="$${external_rtp_ip}"/>
+    <param name="sip-ip" value="$${external_sip_ip}"/>
+    <param name="ext-rtp-ip" value="$${external_rtp_ip}"/>
+    <param name="ext-sip-ip" value="$${external_sip_ip}"/>
+
+    <!-- RTP settings -->
+    <param name="rtp-timer-name" value="soft"/>
+    <param name="rtp-timeout-sec" value="300"/>
+    <param name="rtp-hold-timeout-sec" value="1800"/>
+
+    <!-- DTMF settings -->
+    <param name="dtmf-type" value="rfc2833"/>
+    <param name="pass-rfc2833" value="true"/>
+
+    <!-- Codec settings -->
+    <param name="inbound-codec-prefs" value="$${global_codec_prefs}"/>
+    <param name="outbound-codec-prefs" value="$${outbound_codec_prefs}"/>
+    <param name="inbound-codec-negotiation" value="generous"/>
+
+    <!-- No authentication required for inbound calls from Voice Connector -->
+    <param name="auth-calls" value="false"/>
+    <param name="accept-blind-auth" value="true"/>
+
+    <!-- Disable registration (we're receiving calls, not making them) -->
+    <param name="disable-register" value="true"/>
+
+    <!-- Media handling -->
+    <param name="inbound-bypass-media" value="false"/>
+    <param name="inbound-proxy-media" value="true"/>
+
+    <!-- NAT settings -->
+    <param name="apply-nat-acl" value="rfc1918.auto"/>
+    <param name="apply-inbound-acl" value=""/>
+    <param name="local-network-acl" value="localnet.auto"/>
+
+    <!-- SDP settings -->
+    <param name="manage-presence" value="false"/>
+    <param name="presence-probe-on-register" value="false"/>
+
+    <!-- Session timers -->
+    <param name="enable-timer" value="false"/>
+    <param name="minimum-session-expires" value="120"/>
+
+    <!-- Call ID / CSeq behavior -->
+    <param name="track-calls" value="true"/>
+
+    <!-- Logging -->
+    <param name="log-auth-failures" value="true"/>
+    <param name="log-level" value="info"/>
+
+    <!-- Hold music -->
+    <param name="hold-music" value="local_stream://moh"/>
+  </settings>
+</profile>

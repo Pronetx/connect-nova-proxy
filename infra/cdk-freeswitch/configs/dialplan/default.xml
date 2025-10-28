@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  FreeSWITCH Dialplan for Phase 1
+
+  This dialplan answers all incoming calls and plays a canned greeting.
+  No AI integration yet - just validates SIP/RTP connectivity.
+-->
+<include>
+  <context name="public">
+    <!--
+      Catchall extension - answers any incoming call
+      In production, you'd match specific DIDs here
+    -->
+    <extension name="inbound_call">
+      <condition field="destination_number" expression="^.*$">
+        <!-- Log the incoming call -->
+        <action application="log" data="INFO Incoming call from ${caller_id_number} to ${destination_number}"/>
+
+        <!-- Answer the call -->
+        <action application="answer"/>
+
+        <!-- Brief pause to ensure media is established -->
+        <action application="sleep" data="500"/>
+
+        <!-- Play greeting message -->
+        <action application="playback" data="/usr/local/freeswitch/sounds/greeting.wav"/>
+
+        <!-- Brief pause before hangup -->
+        <action application="sleep" data="1000"/>
+
+        <!-- Log call completion -->
+        <action application="log" data="INFO Call completed for ${caller_id_number}"/>
+
+        <!-- Hangup -->
+        <action application="hangup"/>
+      </condition>
+    </extension>
+
+    <!-- Emergency: If nothing matches, log and reject -->
+    <extension name="unhandled">
+      <condition field="destination_number" expression="^$">
+        <action application="log" data="ERROR Unhandled call: ${caller_id_number} -> ${destination_number}"/>
+        <action application="respond" data="404"/>
+        <action application="hangup"/>
+      </condition>
+    </extension>
+  </context>
+</include>

@@ -1,0 +1,37 @@
+<configuration name="nova_sonic.conf" description="Amazon Nova Sonic Configuration">
+  <settings>
+    <!-- AWS Configuration -->
+    <param name="aws-region" value="us-east-1"/>
+
+    <!-- Leave empty to use IAM role credentials (recommended for EC2/ECS) -->
+    <param name="aws-access-key-id" value=""/>
+    <param name="aws-secret-access-key" value=""/>
+    <param name="aws-session-token" value=""/>
+
+    <!-- Nova Sonic Model Configuration -->
+    <param name="model-id" value="amazon.nova-sonic-v1:0"/>
+
+    <!-- Audio Configuration -->
+    <param name="sample-rate" value="8000"/>
+    <param name="channels" value="1"/>
+    <param name="bits-per-sample" value="16"/>
+
+    <!-- Nova Settings -->
+    <param name="default-voice-id" value="en_us_matthew"/>
+    <param name="default-temperature" value="1.0"/>
+    <param name="default-top-p" value="0.9"/>
+    <param name="max-tokens" value="2048"/>
+
+    <!-- Default System Prompt -->
+    <param name="default-system-prompt" value="You are a helpful and friendly AI assistant. Keep your responses concise and conversational, typically 2-3 sentences. You are speaking on a phone call, so be natural and speak as you would in conversation."/>
+
+    <!-- Optional: Call Recording -->
+    <param name="recording-enabled" value="false"/>
+    <param name="recording-bucket" value=""/>
+    <param name="recording-prefix" value="nova-recordings/"/>
+
+    <!-- Optional: Logging -->
+    <param name="debug-audio" value="false"/>
+    <param name="log-events" value="true"/>
+  </settings>
+</configuration>

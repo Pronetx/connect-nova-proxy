@@ -154,6 +154,13 @@ export class VoipGatewayEC2Stack extends cdk.Stack {
       'Allow SSH traffic'
     );
 
+    // Allow TCP Audio Server port 8085 (for FreeSWITCH audio streaming)
+    securityGroup.addIngressRule(
+      ec2.Peer.anyIpv4(),
+      ec2.Port.tcp(8085),
+      'Allow TCP Audio Server for FreeSWITCH'
+    );
+
     // Create an EC2 instance in a public subnet
     const instance = new ec2.Instance(this, 'VoipGatewayServer', {
       vpc,

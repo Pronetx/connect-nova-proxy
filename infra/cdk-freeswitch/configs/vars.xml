@@ -1,0 +1,35 @@
+<include>
+  <!-- Global Variables for FreeSWITCH -->
+
+  <!-- External IP will be replaced during installation -->
+  <X-PRE-PROCESS cmd="set" data="external_rtp_ip=EXTERNAL_IP_PLACEHOLDER"/>
+  <X-PRE-PROCESS cmd="set" data="external_sip_ip=EXTERNAL_IP_PLACEHOLDER"/>
+
+  <!-- Local IP address -->
+  <X-PRE-PROCESS cmd="exec-set" data="local_ip_v4=ip addr show | grep 'inet ' | grep -v '127.0.0.1' | head -1 | awk '{print $2}' | cut -d/ -f1"/>
+
+  <!-- SIP ports -->
+  <X-PRE-PROCESS cmd="set" data="external_sip_port=5060"/>
+  <X-PRE-PROCESS cmd="set" data="external_tls_port=5061"/>
+
+  <!-- RTP port range (must match security group) -->
+  <X-PRE-PROCESS cmd="set" data="rtp_start_port=10000"/>
+  <X-PRE-PROCESS cmd="set" data="rtp_end_port=20000"/>
+
+  <!-- Domain -->
+  <X-PRE-PROCESS cmd="set" data="domain=$${local_ip_v4}"/>
+  <X-PRE-PROCESS cmd="set" data="domain_name=$${domain}"/>
+
+  <!-- Sound file paths -->
+  <X-PRE-PROCESS cmd="set" data="sound_prefix=$${sounds_dir}/en/us/callie"/>
+
+  <!-- Codec preferences -->
+  <X-PRE-PROCESS cmd="set" data="global_codec_prefs=PCMU,PCMA"/>
+  <X-PRE-PROCESS cmd="set" data="outbound_codec_prefs=PCMU,PCMA"/>
+
+  <!-- SIP settings -->
+  <X-PRE-PROCESS cmd="set" data="sip_tls_version=tlsv1.2"/>
+
+  <!-- Console log level -->
+  <X-PRE-PROCESS cmd="set" data="console_loglevel=info"/>
+</include>

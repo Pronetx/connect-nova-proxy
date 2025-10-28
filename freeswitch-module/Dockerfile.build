@@ -1,0 +1,21 @@
+# Dockerfile to build mod_nova_sonic.so compatible with safarov/freeswitch
+FROM safarov/freeswitch:latest
+
+# Install build tools
+RUN apt-get update && apt-get install -y \
+    gcc \
+    make \
+    freeswitch-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy source
+COPY src/mod_nova_sonic.c /tmp/
+COPY Makefile /tmp/
+
+# Build module
+WORKDIR /tmp
+RUN gcc -fPIC -O2 -Wall -I/usr/include/freeswitch -shared -o mod_nova_sonic.so mod_nova_sonic.c || \
+    gcc -fPIC -O2 -I/usr/include/freeswitch -shared -o mod_nova_sonic.so mod_nova_sonic.c
+
+# The module will be extracted from this container
+CMD ["cp", "/tmp/mod_nova_sonic.so", "/output/"]
