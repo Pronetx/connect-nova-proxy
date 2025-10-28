@@ -8,3 +8,4 @@ dependency-reduced-pom.xml
 *.jar
 cdk.context.json
 node_modules
+voice-gateway/target 2/
