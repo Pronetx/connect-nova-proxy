@@ -184,12 +184,9 @@ public class FreeSwitchAudioHandler implements Runnable {
             int r = in.read(frame, off, 320 - off);
             if (r < 0) return (off == 0 ? -1 : off); // EOF if nothing read
             if (r == 0) {
-                try {
-                    Thread.sleep(1); // avoid busy-spin if a non-blocking InputStream returns 0
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    throw new IOException("Interrupted while reading frame", e);
-                }
+                // Our QueuedPcm16InputStream may return 0 when no frame is available.
+                // Back off briefly to avoid tight CPU spin that leads to playout jitter.
+                try { Thread.sleep(2); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
                 continue;
             }
             off += r;

@@ -128,6 +128,11 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
             log.info("Received audio output {} from {}", content, role);
         }
         byte[] data = decoder.decode(content);
+        // Ensure even length for 16-bit samples
+        if ((data.length & 1) == 1) {
+            log.warn("Odd-length audio chunk {} bytes from Nova; dropping last byte to preserve 16-bit alignment", data.length);
+            data = java.util.Arrays.copyOf(data, data.length - 1);
+        }
         try {
             audioStream.append(data);
         } catch (InterruptedException e) {
