@@ -54,6 +54,9 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
         promptName = node.get("promptName").asText();
         log.info("Completion started with promptId: {}", promptName);
         // Reset barge-in flag for new completion
+        if (bargeInDetected) {
+            log.info("✅ Clearing barge-in flag on new completion start");
+        }
         bargeInDetected = false;
         bargeInTimestamp = 0;
     }
@@ -116,9 +119,8 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
 
         // Skip audio output if barge-in was detected
         if (bargeInDetected) {
-            if (debugAudioOutput) {
-                log.debug("Skipping audio output due to barge-in");
-            }
+            log.warn("⚠️ Skipping audio output due to barge-in flag (role={}, bargeInAge={}ms)",
+                    role, System.currentTimeMillis() - bargeInTimestamp);
             return;
         }
 
@@ -138,12 +140,23 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
         log.info("Content end for node: {}", node);
         String contentId = node.get("contentId").asText();
         String stopReason = node.has("stopReason") ? node.get("stopReason").asText() : "";
-        log.info("Content ended: {} with reason: {}", contentId, stopReason);
+        String role = node.has("role") ? node.get("role").asText() : "UNKNOWN";
+        log.info("Content ended: {} (role={}) with reason: {}", contentId, role, stopReason);
 
         // Handle interruption - clear audio queue immediately for instant barge-in
-        if (stopReason.toUpperCase().contains("INTERRUPT")) {
+        if (stopReason != null && stopReason.toUpperCase().contains("INTERRUPT")) {
             log.info("🔴🔴🔴 BARGE-IN DETECTED - stopReason: {} - Clearing audio playback queue 🔴🔴🔴", stopReason);
+            bargeInDetected = true;
+            bargeInTimestamp = System.currentTimeMillis();
             audioStream.clearQueue();
+        } else if ("ASSISTANT".equals(role)) {
+            // Normal turn boundary for ASSISTANT only: flush any partial 320-byte remainder so the last syllable isn't cut.
+            try {
+                audioStream.endOfTurn();
+                log.info("✅ End-of-turn flush completed for ASSISTANT (padded remainder + 20ms comfort silence)");
+            } catch (Exception e) {
+                log.warn("endOfTurn() failed (non-fatal)", e);
+            }
         }
     }
 
@@ -197,6 +210,12 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
     @Override
     public void onComplete() {
         log.info("Stream complete");
+        // Defensive: ensure any residual audio is flushed at stream completion.
+        try {
+            audioStream.endOfTurn();
+        } catch (Exception e) {
+            log.debug("endOfTurn() at onComplete ignored", e);
+        }
     }
 
     @Override
@@ -249,6 +268,12 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
             }
         } else {
             log.warn("CallRecorder is null - recording will not be saved");
+        }
+        // Ensure the downlink reader unblocks and exits cleanly.
+        try {
+            audioStream.close();
+        } catch (IOException ioe) {
+            log.warn("Error closing audio stream", ioe);
         }
     }
 

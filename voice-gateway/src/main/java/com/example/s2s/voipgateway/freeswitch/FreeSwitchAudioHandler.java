@@ -183,6 +183,15 @@ public class FreeSwitchAudioHandler implements Runnable {
         while (off < 320) {
             int r = in.read(frame, off, 320 - off);
             if (r < 0) return (off == 0 ? -1 : off); // EOF if nothing read
+            if (r == 0) {
+                try {
+                    Thread.sleep(1); // avoid busy-spin if a non-blocking InputStream returns 0
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Interrupted while reading frame", e);
+                }
+                continue;
+            }
             off += r;
         }
         return 320;
@@ -200,7 +209,7 @@ public class FreeSwitchAudioHandler implements Runnable {
             try {
                 InputStream socketInput = socket.getInputStream();
                 Base64.Encoder encoder = Base64.getEncoder();
-                byte[] buffer = new byte[320]; // 20ms at 8kHz, 16-bit
+                byte[] buffer = new byte[320]; // 20ms @ 8kHz, 16-bit mono
                 String contentName = UUID.randomUUID().toString();
                 boolean startSent = false;
 
@@ -210,8 +219,8 @@ public class FreeSwitchAudioHandler implements Runnable {
                 int chunkCount = 0;
 
                 while (active && !socket.isClosed()) {
-                    int bytesRead = socketInput.read(buffer);
-                    if (bytesRead <= 0) {
+                    int bytesRead = readFully320(socketInput, buffer);
+                    if (bytesRead < 0) {
                         LOG.info("FreeSWITCH audio stream ended (total: {} bytes in {} chunks)", totalBytesRead, chunkCount);
                         break;
                     }
@@ -246,8 +255,8 @@ public class FreeSwitchAudioHandler implements Runnable {
                         startSent = true;
                     }
 
-                    // Send audio chunks as AudioInputEvent
-                    String base64Audio = encoder.encodeToString(buffer);
+                    // Send audio chunk (exact 320B) as AudioInputEvent
+                    String base64Audio = encoder.encodeToString(java.util.Arrays.copyOf(buffer, bytesRead));
                     AudioInputEvent audioEvent = new AudioInputEvent(
                             AudioInputEvent.AudioInput.builder()
                                     .promptName(sessionId)
@@ -271,67 +280,42 @@ public class FreeSwitchAudioHandler implements Runnable {
             }
         }, "FS-to-Nova-" + sessionId);
 
-        // Thread 2: Nova → FreeSWITCH (PCM16, 320-byte frames) with pacing and drift control
+        // Thread 2: Nova → FreeSWITCH (PCM16, 320-byte frames) with steady 20ms pacing (no drops)
         Thread novaToFreeswitch = new Thread(() -> {
             try {
                 InputStream novaAudio = eventHandler.getAudioInputStream();
                 OutputStream socketOutput = socket.getOutputStream();
                 socket.setTcpNoDelay(true);
 
-                final int FRAME_BYTES = 320;            // 20ms @ 8kHz, 16-bit mono
-                final long PERIOD_NS  = 20_000_000L;    // 20ms in nanoseconds
-                final long DROP_NS    = 100_000_000L;   // if >100ms behind, drop to catch up
+                final int FRAME_BYTES = 320;          // 20ms @ 8kHz, 16-bit mono
+                final long PERIOD_NS  = 20_000_000L;  // 20ms
 
                 byte[] frame = new byte[FRAME_BYTES];
                 int framesWritten = 0;
 
-                // Start pacing from "now"
-                long base = System.nanoTime();
-                long frameIndex = 0;
+                // steady metronome pacing; never "catch up" faster than real time
+                long next = System.nanoTime() + PERIOD_NS;
 
-                LOG.info("Starting Nova → FreeSWITCH audio stream (PCM16, paced @ 20ms)");
+                LOG.info("Starting Nova → FreeSWITCH audio stream (PCM16, paced @ 20ms, no frame drops)");
 
                 while (active && !socket.isClosed()) {
-                    // Block until we have a full frame
+                    // Read exactly one 20ms frame (blocking)
                     int bytesRead = readFully320(novaAudio, frame);
-                    if (bytesRead < 0) break;
-                    if (bytesRead == 0) {
-                        // No audio yet: sleep a tiny bit and try again
-                        Thread.sleep(2);
-                        continue;
-                    }
-                    if (bytesRead != FRAME_BYTES) {
-                        // Incomplete frame
-                        LOG.warn("Nova → FS: incomplete frame {} bytes (expected 320). Skipping.", bytesRead);
-                        continue;
-                    }
+                    if (bytesRead < 0) break; // EOF/closed
 
-                    long scheduled = base + frameIndex * PERIOD_NS;
                     long now = System.nanoTime();
-
-                    // If we're early, wait until the tick
-                    if (now < scheduled) {
-                        long waitNs = scheduled - now;
-                        // Use parkNanos for sub-millisecond precision
+                    long waitNs = next - now;
+                    if (waitNs > 0) {
                         java.util.concurrent.locks.LockSupport.parkNanos(waitNs);
-                    } else {
-                        // We're late; if too late, drop frames to catch up
-                        while ((now - scheduled) > DROP_NS) {
-                            // Drop this frame and pull the next one to reduce latency
-                            int br = readFully320(novaAudio, frame);
-                            if (br != FRAME_BYTES) break; // if nothing available, stop dropping
-                            frameIndex++;                  // we "consumed" a frame
-                            scheduled = base + frameIndex * PERIOD_NS;
-                            now = System.nanoTime();
-                            LOG.debug("Nova → FS: dropping late frame to catch up (lag {} ms)",
-                                      (now - scheduled) / 1_000_000);
-                        }
                     }
 
-                    socketOutput.write(frame);
+                    socketOutput.write(frame, 0, bytesRead);
                     socketOutput.flush();
                     framesWritten++;
-                    frameIndex++;
+
+                    // advance target time; if we were late, do not "catch up" by bursting
+                    long afterWrite = System.nanoTime();
+                    next = Math.max(next + PERIOD_NS, afterWrite + PERIOD_NS / 2);
 
                     if (framesWritten % 50 == 0) {
                         LOG.info("Nova → FS: wrote {} frames ({} bytes)", framesWritten, framesWritten * FRAME_BYTES);
