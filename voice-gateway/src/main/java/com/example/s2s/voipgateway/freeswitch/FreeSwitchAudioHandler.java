@@ -271,36 +271,70 @@ public class FreeSwitchAudioHandler implements Runnable {
             }
         }, "FS-to-Nova-" + sessionId);
 
-        // Thread 2: Nova → FreeSWITCH (PCM16, 320-byte frames)
+        // Thread 2: Nova → FreeSWITCH (PCM16, 320-byte frames) with pacing and drift control
         Thread novaToFreeswitch = new Thread(() -> {
             try {
                 InputStream novaAudio = eventHandler.getAudioInputStream();
                 OutputStream socketOutput = socket.getOutputStream();
                 socket.setTcpNoDelay(true);
-                byte[] frame = new byte[320]; // Exact 20ms PCM16 frame
+
+                final int FRAME_BYTES = 320;            // 20ms @ 8kHz, 16-bit mono
+                final long PERIOD_NS  = 20_000_000L;    // 20ms in nanoseconds
+                final long DROP_NS    = 100_000_000L;   // if >100ms behind, drop to catch up
+
+                byte[] frame = new byte[FRAME_BYTES];
                 int framesWritten = 0;
 
-                LOG.info("Starting Nova → FreeSWITCH audio stream (PCM16, 320-byte frames)");
+                // Start pacing from "now"
+                long base = System.nanoTime();
+                long frameIndex = 0;
+
+                LOG.info("Starting Nova → FreeSWITCH audio stream (PCM16, paced @ 20ms)");
 
                 while (active && !socket.isClosed()) {
-                    int n = readFully320(novaAudio, frame);
-
-                    if (n < 0) {
-                        // No audio yet / EOF
-                        try {
-                            Thread.sleep(10);
-                        } catch (InterruptedException ignored) {}
+                    // Block until we have a full frame
+                    int bytesRead = readFully320(novaAudio, frame);
+                    if (bytesRead < 0) break;
+                    if (bytesRead == 0) {
+                        // No audio yet: sleep a tiny bit and try again
+                        Thread.sleep(2);
+                        continue;
+                    }
+                    if (bytesRead != FRAME_BYTES) {
+                        // Incomplete frame
+                        LOG.warn("Nova → FS: incomplete frame {} bytes (expected 320). Skipping.", bytesRead);
                         continue;
                     }
 
-                    // Write exactly 320 bytes per 20ms frame
+                    long scheduled = base + frameIndex * PERIOD_NS;
+                    long now = System.nanoTime();
+
+                    // If we're early, wait until the tick
+                    if (now < scheduled) {
+                        long waitNs = scheduled - now;
+                        // Use parkNanos for sub-millisecond precision
+                        java.util.concurrent.locks.LockSupport.parkNanos(waitNs);
+                    } else {
+                        // We're late; if too late, drop frames to catch up
+                        while ((now - scheduled) > DROP_NS) {
+                            // Drop this frame and pull the next one to reduce latency
+                            int br = readFully320(novaAudio, frame);
+                            if (br != FRAME_BYTES) break; // if nothing available, stop dropping
+                            frameIndex++;                  // we "consumed" a frame
+                            scheduled = base + frameIndex * PERIOD_NS;
+                            now = System.nanoTime();
+                            LOG.debug("Nova → FS: dropping late frame to catch up (lag {} ms)",
+                                      (now - scheduled) / 1_000_000);
+                        }
+                    }
+
                     socketOutput.write(frame);
                     socketOutput.flush();
                     framesWritten++;
+                    frameIndex++;
 
-                    // Log every 50 frames (every second at 20ms/frame)
                     if (framesWritten % 50 == 0) {
-                        LOG.info("Nova → FS: wrote {} frames ({} bytes)", framesWritten, framesWritten * 320);
+                        LOG.info("Nova → FS: wrote {} frames ({} bytes)", framesWritten, framesWritten * FRAME_BYTES);
                     }
                 }
 
