@@ -267,6 +267,41 @@ aws ssm send-command \
 **Issue**: Wrong AWS region for Bedrock
 **Solution**: Always set `AWS_REGION=us-east-1` when starting gateway (Nova Sonic only available in us-east-1)
 
+## FreeSWITCH Integration
+
+### FreeSWITCH Instance
+- **Instance ID**: `i-06fcbe4efc776029b`
+- **Public IP**: `44.237.82.96`
+- **Private IP**: `10.0.1.121`
+- **SSH Key**: `/Users/yasser/freeswitch.pem`
+- **Type**: Pre-built AMI deployment
+
+### Connecting to FreeSWITCH Instance
+
+```bash
+# SSH access
+ssh -i /Users/yasser/freeswitch.pem admin@44.237.82.96
+
+# Or use SSM Session Manager (if configured)
+aws ssm start-session --target i-06fcbe4efc776029b
+```
+
+### Architecture
+
+The FreeSWITCH integration uses a two-tier architecture:
+
+1. **Telephony Tier (FreeSWITCH)**: Handles SIP/RTP telephony
+   - Instance: i-06fcbe4efc776029b at 44.237.82.96
+   - Runs FreeSWITCH with mod_nova_sonic C module
+   - Forwards audio via TCP to Java Gateway
+
+2. **AI Tier (Java Gateway)**: Handles Nova Sonic integration
+   - Instance: i-0fa82e4df8fcad08e at 34.208.83.171
+   - Listens on TCP port 8085 for audio connections
+   - Bridges audio with Amazon Nova Sonic (Bedrock)
+
+See `INTEGRATION_GUIDE.md` for detailed integration documentation.
+
 ## Important Notes
 
 - This is a **proof of concept** - not production-ready

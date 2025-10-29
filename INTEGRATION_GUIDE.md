@@ -68,15 +68,32 @@ This integration uses a **two-tier architecture** that separates telephony infra
 
 **FreeSWITCH Instance**:
 ```bash
-# Install FreeSWITCH (if not already installed)
-# See: https://freeswitch.org/confluence/display/FREESWITCH/Installation
+# Current FreeSWITCH instance (pre-built AMI)
+# Instance ID: i-06fcbe4efc776029b
+# Public IP: 44.237.82.96
+# Private IP: 10.0.1.121
+# SSH Key: /Users/yasser/freeswitch.pem
+
+# Connect via SSH
+ssh -i /Users/yasser/freeswitch.pem admin@44.237.82.96
+
+# Or use SSM Session Manager
+aws ssm start-session --target i-06fcbe4efc776029b
+
+# Verify FreeSWITCH is running
+systemctl status freeswitch
 
 # Ensure FreeSWITCH development headers are available
-ls /usr/local/freeswitch/include/freeswitch/switch.h
+ls /usr/include/freeswitch/switch.h
 ```
 
 **Java Gateway Instance**:
 ```bash
+# Current Java Gateway instance
+# Instance ID: i-0fa82e4df8fcad08e
+# Public IP: 34.208.83.171
+# Private IP: 10.0.0.68
+
 # Java 9+ required
 java -version
 
@@ -101,26 +118,30 @@ ls -l /usr/local/freeswitch/mod/mod_nova_sonic.so
 
 ### Step 2: Configure FreeSWITCH Module
 
-Set the Java gateway address (default: localhost:8085):
+Set the Java gateway address to the Java Gateway instance:
 
 ```bash
-# Via environment variable
-export NOVA_GATEWAY_HOST=10.0.1.100  # IP of Java gateway instance
+# Via environment variable (current production setup)
+export NOVA_GATEWAY_HOST=34.208.83.171  # Java Gateway public IP
 export NOVA_GATEWAY_PORT=8085
 
 # Restart FreeSWITCH
 sudo systemctl restart freeswitch
 ```
 
-Or create `/usr/local/freeswitch/conf/autoload_configs/nova_sonic.conf.xml`:
+Or create `/etc/freeswitch/autoload_configs/nova_sonic.conf.xml`:
 ```xml
 <configuration name="nova_sonic.conf" description="Nova Sonic Audio Proxy">
   <settings>
-    <param name="gateway-host" value="10.0.1.100"/>
+    <param name="gateway-host" value="34.208.83.171"/>
     <param name="gateway-port" value="8085"/>
   </settings>
 </configuration>
 ```
+
+**Network Configuration**:
+- Ensure security group on Java Gateway (i-0fa82e4df8fcad08e) allows TCP 8085 from FreeSWITCH instance (44.237.82.96)
+- Or if using private IPs, configure `NOVA_GATEWAY_HOST=10.0.0.68` and ensure VPC routing is correct
 
 ### Step 3: Load FreeSWITCH Module
 
@@ -455,14 +476,25 @@ java -XX:+UseG1GC -jar s2s-voip-gateway.jar
 4. **IAM Roles**: Use EC2 instance roles instead of access keys
 5. **Logging**: Enable CloudWatch logs for audit trail
 
-## Next Steps
+## Current Status
 
-1. ✅ Basic integration working
-2. ⏳ Add TLS encryption to TCP connection
-3. ⏳ Add authentication/authorization
-4. ⏳ Implement connection pooling for scale
-5. ⏳ Add metrics and monitoring (CloudWatch)
-6. ⏳ Implement circuit breakers for resilience
+### Deployed Infrastructure
+- **FreeSWITCH Instance**: i-06fcbe4efc776029b (44.237.82.96) - Pre-built AMI
+- **Java Gateway Instance**: i-0fa82e4df8fcad08e (34.208.83.171) - Running mjSIP-based gateway
+- **Java Gateway Listening**: TCP port 8085 for FreeSWITCH connections
+
+### Next Steps
+
+1. ⏳ Build and install mod_nova_sonic.so on FreeSWITCH instance
+2. ⏳ Configure mod_nova_sonic to point to Java Gateway (34.208.83.171:8085)
+3. ⏳ Load mod_nova_sonic in FreeSWITCH
+4. ⏳ Configure FreeSWITCH dialplan to use nova_sonic application
+5. ⏳ Test end-to-end call flow
+6. ⏳ Add TLS encryption to TCP connection
+7. ⏳ Add authentication/authorization
+8. ⏳ Implement connection pooling for scale
+9. ⏳ Add metrics and monitoring (CloudWatch)
+10. ⏳ Implement circuit breakers for resilience
 
 ## Support
 

@@ -59,7 +59,7 @@
                     <archive>
                         <manifest>
                             <addClasspath>true</addClasspath>
-                            <mainClass>com.example.s2s.voipgateway.FreeSwitchGateway</mainClass>
+                            <mainClass>com.example.s2s.voipgateway.freeswitch.FreeSwitchGatewayMain</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
