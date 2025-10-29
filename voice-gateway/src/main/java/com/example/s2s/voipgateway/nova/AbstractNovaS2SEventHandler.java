@@ -1,7 +1,7 @@
 package com.example.s2s.voipgateway.nova;
 
 import com.example.s2s.voipgateway.nova.event.*;
-import com.example.s2s.voipgateway.nova.io.QueuedUlawInputStream;
+import com.example.s2s.voipgateway.nova.io.QueuedPcm16InputStream;
 import com.example.s2s.voipgateway.nova.metrics.NovaUsageMetricsPublisher;
 import com.example.s2s.voipgateway.nova.observer.InteractObserver;
 import com.example.s2s.voipgateway.recording.CallRecorder;
@@ -27,7 +27,7 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
     private static final Logger log = LoggerFactory.getLogger(AbstractNovaS2SEventHandler.class);
     private static final Base64.Decoder decoder = Base64.getDecoder();
     private static final String ERROR_AUDIO_FILE = "error.wav";
-    private final QueuedUlawInputStream audioStream = new QueuedUlawInputStream();
+    private final QueuedPcm16InputStream audioStream = new QueuedPcm16InputStream();
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final NovaUsageMetricsPublisher metricsPublisher = new NovaUsageMetricsPublisher();
     private InteractObserver<NovaSonicEvent> outbound;
