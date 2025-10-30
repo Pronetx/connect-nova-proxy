@@ -56,6 +56,7 @@ public class FreeSwitchAudioHandler implements Runnable {
         int sampleRate;
         int channels;
         String format;
+        String uui; // User-to-User Information header
     }
 
     public FreeSwitchAudioHandler(Socket socket, NovaMediaConfig mediaConfig) {
@@ -118,8 +119,9 @@ public class FreeSwitchAudioHandler implements Runnable {
             sessionId = sessionInfo.callUuid;
             callerId = sessionInfo.caller;
 
-            LOG.info("Handshake received - Session: {}, Caller: {}, SampleRate: {}, Channels: {}, Format: {}",
-                    sessionId, callerId, sessionInfo.sampleRate, sessionInfo.channels, sessionInfo.format);
+            LOG.info("Handshake received - Session: {}, Caller: {}, SampleRate: {}, Channels: {}, Format: {}, UUI: {}",
+                    sessionId, callerId, sessionInfo.sampleRate, sessionInfo.channels, sessionInfo.format,
+                    sessionInfo.uui != null ? sessionInfo.uui : "none");
 
             // Initialize Nova Sonic connection (use same setup as NovaStreamerFactory)
             NettyNioAsyncHttpClient.Builder nettyBuilder = NettyNioAsyncHttpClient.builder()
@@ -141,10 +143,30 @@ public class FreeSwitchAudioHandler implements Runnable {
             // Store socket output for control messages
             socketOutput = socket.getOutputStream();
 
-            // Select prompt based on caller/called number using PromptSelector
-            String calledNumber = null; // TODO: Extract from handshake if available
-            String promptConfigPath = com.example.s2s.voipgateway.nova.tools.PromptSelector.selectPrompt(
-                    callerId, calledNumber);
+            // Select prompt: check UUI first, then fall back to PromptSelector
+            String promptConfigPath = null;
+
+            // Try to extract prompt from UUI if present
+            if (sessionInfo.uui != null && !sessionInfo.uui.isEmpty()) {
+                try {
+                    String promptFromUui = extractPromptFromUui(sessionInfo.uui);
+                    if (promptFromUui != null) {
+                        promptConfigPath = "prompts/" + promptFromUui;
+                        LOG.info("Using prompt from UUI: {}", promptConfigPath);
+                    }
+                } catch (Exception e) {
+                    LOG.warn("Failed to parse prompt from UUI: {}", sessionInfo.uui, e);
+                }
+            }
+
+            // Fall back to PromptSelector if no UUI prompt
+            if (promptConfigPath == null) {
+                String calledNumber = null; // TODO: Extract from handshake if available
+                promptConfigPath = com.example.s2s.voipgateway.nova.tools.PromptSelector.selectPrompt(
+                        callerId, calledNumber);
+                LOG.info("Using prompt from PromptSelector: {}", promptConfigPath);
+            }
+
             PromptConfiguration promptConfig = null;
             String systemPrompt = mediaConfig.getNovaPrompt();
 
@@ -434,7 +456,7 @@ public class FreeSwitchAudioHandler implements Runnable {
 
     /**
      * Parses JSON handshake format.
-     * Expected format: {"call_uuid":"...", "caller":"...", "sample_rate":8000, "channels":1, "format":"PCM16"}
+     * Expected format: {"call_uuid":"...", "caller":"...", "sample_rate":8000, "channels":1, "format":"PCM16", "uui":"..."}
      */
     private SessionInfo parseJsonHandshake(String json) throws Exception {
         SessionInfo info = new SessionInfo();
@@ -446,6 +468,7 @@ public class FreeSwitchAudioHandler implements Runnable {
         info.callUuid   = extractJsonString(body, "call_uuid");
         info.caller     = extractJsonString(body, "caller");
         info.format     = extractJsonString(body, "format");
+        info.uui        = extractJsonString(body, "uui");
 
         String srStr    = extractJsonNumber(body, "sample_rate");
         String chStr    = extractJsonNumber(body, "channels");
@@ -538,6 +561,58 @@ public class FreeSwitchAudioHandler implements Runnable {
         while (end < json.length() && "0123456789".indexOf(json.charAt(end)) >= 0) end++;
         if (end == start) return null;
         return json.substring(start, end);
+    }
+
+    /**
+     * Extracts prompt name from UUI JSON.
+     * Expected format: {"prompt":"promptName.prompt"} or hex-encoded with ;encoding=hex suffix
+     * @param uui The UUI string (may be hex-encoded like "7B...7D;encoding=hex")
+     * @return The prompt name (e.g., "promptName.prompt") or null if not found
+     */
+    private String extractPromptFromUui(String uui) {
+        if (uui == null || uui.isEmpty()) {
+            return null;
+        }
+
+        try {
+            // Check if UUI is hex-encoded (format: <hex>;encoding=hex)
+            String decodedUui = uui;
+            if (uui.contains(";encoding=hex")) {
+                String hexPart = uui.substring(0, uui.indexOf(";encoding=hex"));
+                decodedUui = hexToString(hexPart);
+                LOG.info("Decoded hex UUI: {} -> {}", hexPart, decodedUui);
+            }
+
+            // Try to parse as JSON
+            String promptValue = extractJsonString(decodedUui, "prompt");
+            if (promptValue != null && !promptValue.isEmpty()) {
+                LOG.info("Extracted prompt from UUI: {}", promptValue);
+                return promptValue;
+            }
+        } catch (Exception e) {
+            LOG.debug("UUI is not JSON or does not contain prompt field: {}", uui, e);
+        }
+
+        return null;
+    }
+
+    /**
+     * Converts hex string to regular string.
+     * @param hex Hex string (e.g., "48656C6C6F")
+     * @return Decoded string (e.g., "Hello")
+     */
+    private String hexToString(String hex) {
+        if (hex == null || hex.isEmpty()) {
+            return "";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < hex.length() - 1; i += 2) {
+            String hexByte = hex.substring(i, i + 2);
+            int decimal = Integer.parseInt(hexByte, 16);
+            sb.append((char) decimal);
+        }
+        return sb.toString();
     }
 
     private void cleanup() {

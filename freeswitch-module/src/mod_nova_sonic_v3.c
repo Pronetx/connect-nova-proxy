@@ -341,11 +341,33 @@ SWITCH_STANDARD_APP(nova_ai_session_function) {
         return;
     }
 
+    /* Extract UUI from SIP header if present */
+    const char *uui = switch_channel_get_variable(channel, "sip_h_User-to-User");
+
     /* Send JSON handshake to gateway */
-    char handshake[512];
-    snprintf(handshake, sizeof(handshake),
-        "{\"call_uuid\":\"%s\",\"caller\":\"%s\",\"sample_rate\":8000,\"channels\":1,\"format\":\"PCM16\"}\n",
-        ctx->session_id, ctx->caller_id);
+    char handshake[1024];
+    if (uui && *uui) {
+        /* Escape quotes in UUI for JSON */
+        char escaped_uui[512];
+        int j = 0;
+        for (int i = 0; uui[i] && j < sizeof(escaped_uui) - 2; i++) {
+            if (uui[i] == '"' || uui[i] == '\\') {
+                escaped_uui[j++] = '\\';
+            }
+            escaped_uui[j++] = uui[i];
+        }
+        escaped_uui[j] = '\0';
+
+        snprintf(handshake, sizeof(handshake),
+                 "{\"call_uuid\":\"%s\",\"caller\":\"%s\",\"sample_rate\":8000,\"channels\":1,\"format\":\"PCM16\",\"uui\":\"%s\"}\n",
+                 ctx->session_id, ctx->caller_id, escaped_uui);
+        switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_INFO,
+            "Sending handshake with UUI: %s\n", uui);
+    } else {
+        snprintf(handshake, sizeof(handshake),
+                 "{\"call_uuid\":\"%s\",\"caller\":\"%s\",\"sample_rate\":8000,\"channels\":1,\"format\":\"PCM16\"}\n",
+                 ctx->session_id, ctx->caller_id);
+    }
 
     ssize_t sent = send(ctx->gateway_socket, handshake, strlen(handshake), 0);
     if (sent < 0) {
