@@ -8,6 +8,7 @@ import com.example.s2s.voipgateway.nova.NovaS2SBedrockInteractClient;
 import com.example.s2s.voipgateway.nova.event.*;
 import com.example.s2s.voipgateway.nova.observer.InteractObserver;
 import com.example.s2s.voipgateway.nova.tools.ModularNovaS2SEventHandler;
+import com.example.s2s.voipgateway.nova.tools.PromptConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.http.Protocol;
@@ -140,15 +141,37 @@ public class FreeSwitchAudioHandler implements Runnable {
             // Store socket output for control messages
             socketOutput = socket.getOutputStream();
 
-            // Create event handler with hangup callback that sends control message to FreeSWITCH
-            ModularNovaS2SEventHandler eventHandler = new ModularNovaS2SEventHandler(callerId);
+            // Select prompt based on caller/called number using PromptSelector
+            String calledNumber = null; // TODO: Extract from handshake if available
+            String promptConfigPath = com.example.s2s.voipgateway.nova.tools.PromptSelector.selectPrompt(
+                    callerId, calledNumber);
+            PromptConfiguration promptConfig = null;
+            String systemPrompt = mediaConfig.getNovaPrompt();
+
+            try {
+                promptConfig = PromptConfiguration.fromResource(promptConfigPath);
+                systemPrompt = promptConfig.getSystemPrompt();
+                LOG.info("Loaded prompt configuration from: {}", promptConfigPath);
+                LOG.info("Enabled tools: {}", promptConfig.getToolNames());
+            } catch (Exception e) {
+                LOG.warn("Failed to load prompt configuration from {}: {}. Using default configuration.",
+                        promptConfigPath, e.getMessage());
+            }
+
+            // Create event handler with prompt config if available, otherwise use all tools
+            ModularNovaS2SEventHandler eventHandler;
+            if (promptConfig != null) {
+                eventHandler = new ModularNovaS2SEventHandler(callerId, promptConfig);
+            } else {
+                eventHandler = new ModularNovaS2SEventHandler(callerId);
+            }
+
             eventHandler.setSessionId(sessionId);
             eventHandler.setHangupCallback(() -> {
                 LOG.info("Nova requested hangup for session {}", sessionId);
                 sendHangupControlMessage();
             });
 
-            String systemPrompt = mediaConfig.getNovaPrompt();
             LOG.info("Using system prompt: {}", systemPrompt);
 
             // Start Nova interaction
